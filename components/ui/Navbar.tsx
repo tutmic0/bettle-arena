@@ -19,13 +19,13 @@ export default function Navbar() {
         <Link href="/" className="flex items-center gap-3">
           <Image
             src="/logo.png"
-            alt="Bettle"
+            alt="Battle"
             width={40}
             height={40}
             className="rounded-full"
           />
           <span className="text-white font-black text-xl tracking-wider">
-            BETTLE
+            Battle
           </span>
         </Link>
 

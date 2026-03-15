@@ -6,7 +6,7 @@ import WalletContextProvider from '@/components/wallet/WalletProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Bettle Arena',
+  title: 'Battle Arena',
   description: 'Predict. Hold. Earn.',
 }
 

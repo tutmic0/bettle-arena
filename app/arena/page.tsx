@@ -272,7 +272,7 @@ export default function ArenaPage() {
                 {predictionOpen ? 'Prediction Window Open' : 'Arena Live — Predictions Closed'}
               </span>
             </div>
-            <h1 className="text-5xl font-black tracking-tight">BETTLE <span className="text-[#00C41C]">ARENA</span></h1>
+            <h1 className="text-5xl font-black tracking-tight">Battle <span className="text-[#00C41C]">ARENA</span></h1>
             <p className="text-gray-500 mt-2">
               {predictionOpen
                 ? `Predictions close at ${new Date(arena.prediction_closes_at).toUTCString()}`

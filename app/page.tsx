@@ -29,7 +29,7 @@ export default function Home() {
         <div className="relative z-10 flex flex-col items-center">
           <Image
             src="/logo.png"
-            alt="Bettle"
+            alt="Battle"
             width={180}
             height={180}
             className="mb-8 drop-shadow-[0_0_40px_rgba(0,196,28,0.5)]"
@@ -41,7 +41,7 @@ export default function Home() {
           </div>
 
           <h1 className="text-7xl md:text-9xl font-black tracking-tighter mb-4 leading-none">
-            BETTLE
+            Battle
             <span className="block text-[#00C41C]">ARENA</span>
           </h1>
 
@@ -162,8 +162,8 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-[#00C41C]/10 py-8 px-6 text-center">
         <div className="flex items-center justify-center gap-3 mb-2">
-          <Image src="/logo.png" alt="Bettle" width={24} height={24} />
-          <span className="text-white font-black tracking-wider">BETTLE ARENA</span>
+          <Image src="/logo.png" alt="Battle" width={24} height={24} />
+          <span className="text-white font-black tracking-wider">Battle ARENA</span>
         </div>
         <p className="text-gray-600 text-sm">Built on Bags.fm · Powered by Solana</p>
       </footer>
