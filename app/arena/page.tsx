@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Navbar from '@/components/ui/Navbar'
-import { useWallet } from '@solana/wallet-adapter-react'
 import Countdown from '@/components/ui/Countdown'
+import { useWallet } from '@solana/wallet-adapter-react'
+
 interface Coin {
   token_mint: string
   name: string
@@ -68,33 +69,63 @@ function CoinAvatar({ coin, mint }: { coin?: Coin; mint: string }) {
 }
 
 function MatchCard({
-  match,
+  matchId,
+  coinAMint,
+  coinBMint,
+  round,
   coins,
   predictions,
   onPredict,
   connected,
   submitted,
   eligible,
+  isPlaceholder,
 }: {
-  match: Match
+  matchId: string
+  coinAMint: string
+  coinBMint: string
+  round: number
   coins: { [mint: string]: Coin }
   predictions: { [matchId: string]: string }
   onPredict: (matchId: string, mint: string) => void
   connected: boolean
   submitted: boolean
   eligible: boolean
+  isPlaceholder?: boolean
 }) {
-  const coinA = coins[match.coin_a_mint]
-  const coinB = coins[match.coin_b_mint]
-  const selected = predictions[match.id]
-  const isCompleted = match.status === 'completed'
-  const points = POINTS_MAP[match.round]
-  const canPredict = connected && !submitted && !isCompleted && eligible
+  const coinA = coins[coinAMint]
+  const coinB = coins[coinBMint]
+  const selected = predictions[matchId]
+  const points = POINTS_MAP[round]
+  const canPredict = connected && !submitted && eligible && !isPlaceholder && !!coinAMint && !!coinBMint
 
-  const borderA = selected === match.coin_a_mint ? '2px solid #00C41C' : match.winner_mint === match.coin_a_mint ? '2px solid #C8A84B' : '2px solid transparent'
-  const borderB = selected === match.coin_b_mint ? '2px solid #00C41C' : match.winner_mint === match.coin_b_mint ? '2px solid #C8A84B' : '2px solid transparent'
-  const bgA = selected === match.coin_a_mint ? 'rgba(0,196,28,0.1)' : match.winner_mint === match.coin_a_mint ? 'rgba(200,168,75,0.1)' : '#111'
-  const bgB = selected === match.coin_b_mint ? 'rgba(0,196,28,0.1)' : match.winner_mint === match.coin_b_mint ? 'rgba(200,168,75,0.1)' : '#111'
+  const borderA = selected === coinAMint ? '2px solid #00C41C' : '2px solid transparent'
+  const borderB = selected === coinBMint ? '2px solid #00C41C' : '2px solid transparent'
+  const bgA = selected === coinAMint ? 'rgba(0,196,28,0.1)' : '#111'
+  const bgB = selected === coinBMint ? 'rgba(0,196,28,0.1)' : '#111'
+
+  if (isPlaceholder || !coinAMint || !coinBMint) {
+    return (
+      <div style={{ background: '#0A0A0A', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, padding: 20, opacity: 0.4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <span style={{ color: '#6B7280', fontSize: 11, fontWeight: 700 }}>MATCH</span>
+          <span style={{ color: '#6B7280', fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: 20 }}>
+            {points} {points === 1 ? 'POINT' : 'POINTS'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1, background: '#111', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
+            <div style={{ color: '#6B7280', fontSize: 12 }}>Winner from R{round - 1}</div>
+          </div>
+          <div style={{ color: '#6B7280', fontWeight: 900, fontSize: 18, flexShrink: 0 }}>VS</div>
+          <div style={{ flex: 1, background: '#111', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
+            <div style={{ color: '#6B7280', fontSize: 12 }}>Winner from R{round - 1}</div>
+          </div>
+        </div>
+        <p style={{ textAlign: 'center', color: '#6B7280', fontSize: 11, marginTop: 12 }}>Pick winners in previous round to unlock</p>
+      </div>
+    )
+  }
 
   return (
     <div style={{ background: '#0A0A0A', border: '1px solid rgba(0,196,28,0.2)', borderRadius: 12, padding: 20 }}>
@@ -108,40 +139,38 @@ function MatchCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <button
           disabled={!canPredict}
-          onClick={() => onPredict(match.id, match.coin_a_mint)}
+          onClick={() => onPredict(matchId, coinAMint)}
           style={{ flex: 1, background: bgA, border: borderA, borderRadius: 12, padding: 16, textAlign: 'left', cursor: canPredict ? 'pointer' : 'not-allowed', opacity: !connected || !eligible ? 0.5 : 1 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <a href={'https://bags.fm/token/' + match.coin_a_mint} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-              <CoinAvatar coin={coinA} mint={match.coin_a_mint} />
+            <a href={'https://bags.fm/token/' + coinAMint} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+              <CoinAvatar coin={coinA} mint={coinAMint} />
             </a>
             <div>
-              <div style={{ color: 'white', fontWeight: 900, fontSize: 14 }}>{coinA?.symbol || match.coin_a_mint.slice(0, 8)}</div>
+              <div style={{ color: 'white', fontWeight: 900, fontSize: 14 }}>{coinA?.symbol || coinAMint.slice(0, 8)}</div>
               <div style={{ color: '#6B7280', fontSize: 12 }}>{coinA?.name || 'Unknown'}</div>
             </div>
           </div>
-          {isCompleted && <div style={{ fontSize: 11, fontWeight: 700, color: '#00C41C' }}>Score: {match.coin_a_score?.toFixed(1)}</div>}
-          {selected === match.coin_a_mint && !isCompleted && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>SELECTED</div>}
+          {selected === coinAMint && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>✓ SELECTED</div>}
         </button>
 
         <div style={{ color: '#C8A84B', fontWeight: 900, fontSize: 18, flexShrink: 0 }}>VS</div>
 
         <button
           disabled={!canPredict}
-          onClick={() => onPredict(match.id, match.coin_b_mint)}
+          onClick={() => onPredict(matchId, coinBMint)}
           style={{ flex: 1, background: bgB, border: borderB, borderRadius: 12, padding: 16, textAlign: 'left', cursor: canPredict ? 'pointer' : 'not-allowed', opacity: !connected || !eligible ? 0.5 : 1 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <a href={'https://bags.fm/token/' + match.coin_b_mint} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-              <CoinAvatar coin={coinB} mint={match.coin_b_mint} />
+            <a href={'https://bags.fm/token/' + coinBMint} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+              <CoinAvatar coin={coinB} mint={coinBMint} />
             </a>
             <div>
-              <div style={{ color: 'white', fontWeight: 900, fontSize: 14 }}>{coinB?.symbol || match.coin_b_mint.slice(0, 8)}</div>
+              <div style={{ color: 'white', fontWeight: 900, fontSize: 14 }}>{coinB?.symbol || coinBMint.slice(0, 8)}</div>
               <div style={{ color: '#6B7280', fontSize: 12 }}>{coinB?.name || 'Unknown'}</div>
             </div>
           </div>
-          {isCompleted && <div style={{ fontSize: 11, fontWeight: 700, color: '#00C41C' }}>Score: {match.coin_b_score?.toFixed(1)}</div>}
-          {selected === match.coin_b_mint && !isCompleted && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>SELECTED</div>}
+          {selected === coinBMint && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>✓ SELECTED</div>}
         </button>
       </div>
 
@@ -289,13 +318,41 @@ export default function ArenaPage() {
   const coinMap: { [mint: string]: Coin } = {}
   arena.arena_coins?.forEach((c) => { coinMap[c.token_mint] = c })
 
-  const matchesByRound: { [round: number]: Match[] } = {}
-  arena.matches?.forEach((m) => {
-    if (!matchesByRound[m.round]) matchesByRound[m.round] = []
-    matchesByRound[m.round].push(m)
-  })
+  // Get Round 1 matches from DB
+  const r1Matches = arena.matches?.filter(m => m.round === 1) || []
+  const r2Matches = arena.matches?.filter(m => m.round === 2) || []
+  const sfMatches = arena.matches?.filter(m => m.round === 3) || []
+  const finalMatch = arena.matches?.find(m => m.round === 4)
 
-  const totalMatches = arena.matches?.length || 0
+  // Build dynamic bracket from predictions
+  // R2: winners of R1 matches 0-1, 2-3, 4-5, 6-7
+  const getR2Coins = (pairIndex: number) => {
+    const m1 = r1Matches[pairIndex * 2]
+    const m2 = r1Matches[pairIndex * 2 + 1]
+    const w1 = m1 ? predictions[m1.id] : null
+    const w2 = m2 ? predictions[m2.id] : null
+    return { coinA: w1 || '', coinB: w2 || '' }
+  }
+
+  // SF: winners of R2 matches 0-1, 2-3
+  const getSFCoins = (pairIndex: number) => {
+    const m1 = r2Matches[pairIndex * 2]
+    const m2 = r2Matches[pairIndex * 2 + 1]
+    const w1 = m1 ? predictions[m1.id] : null
+    const w2 = m2 ? predictions[m2.id] : null
+    return { coinA: w1 || '', coinB: w2 || '' }
+  }
+
+  // Final: winners of SF matches
+  const getFinalCoins = () => {
+    const m1 = sfMatches[0]
+    const m2 = sfMatches[1]
+    const w1 = m1 ? predictions[m1.id] : null
+    const w2 = m2 ? predictions[m2.id] : null
+    return { coinA: w1 || '', coinB: w2 || '' }
+  }
+
+  const totalMatches = arena.matches?.length || 15
   const totalPredicted = Object.keys(predictions).length
   const predictionOpen = new Date() < new Date(arena.prediction_closes_at)
 
@@ -360,31 +417,96 @@ export default function ArenaPage() {
           </div>
         )}
 
-        {[1, 2, 3, 4].map((round) => {
-          const matches = matchesByRound[round]
-          if (!matches || matches.length === 0) return null
-          return (
-            <div key={round} className="mb-12">
-              <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">
-                {round === 1 ? '⚔️' : round === 2 ? '🏆' : round === 3 ? '🔥' : '👑'} {ROUND_LABELS[round]}
-              </h2>
-              <div className={'grid gap-4 ' + (round <= 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 max-w-md')}>
-                {matches.map((match) => (
-                  <MatchCard
-                    key={match.id}
-                    match={match}
-                    coins={coinMap}
-                    predictions={predictions}
-                    onPredict={handlePrediction}
-                    connected={connected}
-                    submitted={submitted}
-                    eligible={eligible}
-                  />
-                ))}
-              </div>
-            </div>
-          )
-        })}
+        {/* Round 1 */}
+        <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">⚔️ {ROUND_LABELS[1]}</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
+          {r1Matches.map((match) => (
+            <MatchCard
+              key={match.id}
+              matchId={match.id}
+              coinAMint={match.coin_a_mint}
+              coinBMint={match.coin_b_mint}
+              round={1}
+              coins={coinMap}
+              predictions={predictions}
+              onPredict={handlePrediction}
+              connected={connected}
+              submitted={submitted}
+              eligible={eligible}
+            />
+          ))}
+        </div>
+
+        {/* Round 2 */}
+        <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">🏆 {ROUND_LABELS[2]}</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
+          {r2Matches.map((match, i) => {
+            const { coinA, coinB } = getR2Coins(i)
+            return (
+              <MatchCard
+                key={match.id}
+                matchId={match.id}
+                coinAMint={coinA}
+                coinBMint={coinB}
+                round={2}
+                coins={coinMap}
+                predictions={predictions}
+                onPredict={handlePrediction}
+                connected={connected}
+                submitted={submitted}
+                eligible={eligible}
+                isPlaceholder={!coinA || !coinB}
+              />
+            )
+          })}
+        </div>
+
+        {/* Semi Finals */}
+        <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">🔥 {ROUND_LABELS[3]}</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
+          {sfMatches.map((match, i) => {
+            const { coinA, coinB } = getSFCoins(i)
+            return (
+              <MatchCard
+                key={match.id}
+                matchId={match.id}
+                coinAMint={coinA}
+                coinBMint={coinB}
+                round={3}
+                coins={coinMap}
+                predictions={predictions}
+                onPredict={handlePrediction}
+                connected={connected}
+                submitted={submitted}
+                eligible={eligible}
+                isPlaceholder={!coinA || !coinB}
+              />
+            )
+          })}
+        </div>
+
+        {/* Final */}
+        <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">👑 {ROUND_LABELS[4]}</h2>
+        <div className="max-w-md mb-12">
+          {finalMatch && (() => {
+            const { coinA, coinB } = getFinalCoins()
+            return (
+              <MatchCard
+                matchId={finalMatch.id}
+                coinAMint={coinA}
+                coinBMint={coinB}
+                round={4}
+                coins={coinMap}
+                predictions={predictions}
+                onPredict={handlePrediction}
+                connected={connected}
+                submitted={submitted}
+                eligible={eligible}
+                isPlaceholder={!coinA || !coinB}
+              />
+            )
+          })()}
+        </div>
 
         {connected && predictionOpen && !submitted && (
           <div className="text-center mt-10">
