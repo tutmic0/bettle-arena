@@ -40,6 +40,37 @@ const ROUND_LABELS: { [k: number]: string } = {
   4: 'Final — 5 Points',
 }
 
+function CoinAvatar({ coin, mint }: { coin?: Coin; mint: string }) {
+  const symbol = coin?.symbol || mint.slice(0, 4).toUpperCase()
+  const initials = symbol.slice(0, 2).toUpperCase()
+
+  if (coin?.image_url) {
+    return (
+      <img
+        src={coin.image_url}
+        alt={symbol}
+        width={40}
+        height={40}
+        style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }}
+        onError={(e) => {
+          const target = e.target as HTMLImageElement
+          target.style.display = 'none'
+          const parent = target.parentElement
+          if (parent) {
+            parent.innerHTML = '<div style="width:40px;height:40px;border-radius:50%;background:rgba(0,196,28,0.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#00C41C">' + initials + '</div>'
+          }
+        }}
+      />
+    )
+  }
+
+  return (
+    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,196,28,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: '#00C41C' }}>
+      {initials}
+    </div>
+  )
+}
+
 function MatchCard({
   match,
   coins,
@@ -59,74 +90,84 @@ function MatchCard({
   const coinB = coins[match.coin_b_mint]
   const selected = predictions[match.id]
   const isCompleted = match.status === 'completed'
+  const points = POINTS_MAP[match.round]
+
+  const borderA = selected === match.coin_a_mint
+    ? '2px solid #00C41C'
+    : match.winner_mint === match.coin_a_mint
+    ? '2px solid #C8A84B'
+    : '2px solid transparent'
+
+  const borderB = selected === match.coin_b_mint
+    ? '2px solid #00C41C'
+    : match.winner_mint === match.coin_b_mint
+    ? '2px solid #C8A84B'
+    : '2px solid transparent'
+
+  const bgA = selected === match.coin_a_mint ? 'rgba(0,196,28,0.1)' : match.winner_mint === match.coin_a_mint ? 'rgba(200,168,75,0.1)' : '#111'
+  const bgB = selected === match.coin_b_mint ? 'rgba(0,196,28,0.1)' : match.winner_mint === match.coin_b_mint ? 'rgba(200,168,75,0.1)' : '#111'
 
   return (
-    <div className="bg-[#0A0A0A] border border-[#00C41C]/20 rounded-xl p-5 hover:border-[#00C41C]/30 transition-all">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-gray-600 text-xs font-bold">MATCH</span>
-        <span className="text-[#00C41C] text-xs font-bold bg-[#00C41C]/10 px-2 py-1 rounded-full">
-          {POINTS_MAP[match.round]} {POINTS_MAP[match.round] === 1 ? 'POINT' : 'POINTS'}
+    <div style={{ background: '#0A0A0A', border: '1px solid rgba(0,196,28,0.2)', borderRadius: 12, padding: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <span style={{ color: '#6B7280', fontSize: 11, fontWeight: 700 }}>MATCH</span>
+        <span style={{ color: '#00C41C', fontSize: 11, fontWeight: 700, background: 'rgba(0,196,28,0.1)', padding: '3px 8px', borderRadius: 20 }}>
+          {points} {points === 1 ? 'POINT' : 'POINTS'}
         </span>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <button
           disabled={!connected || submitted || isCompleted}
           onClick={() => onPredict(match.id, match.coin_a_mint)}
-          className={`flex-1 bg-[#111] border-2 rounded-xl p-4 text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-            selected === match.coin_a_mint
-              ? 'border-[#00C41C] bg-[#00C41C]/10'
-              : match.winner_mint === match.coin_a_mint
-              ? 'border-[#C8A84B] bg-[#C8A84B]/10'
-              : 'border-transparent hover:border-[#00C41C]/50'
-          }`}
+          style={{ flex: 1, background: bgA, border: borderA, borderRadius: 12, padding: 16, textAlign: 'left', cursor: connected && !submitted && !isCompleted ? 'pointer' : 'not-allowed', opacity: !connected ? 0.4 : 1 }}
         >
-          <div className="w-10 h-10 rounded-full bg-[#00C41C]/20 flex items-center justify-center mb-3 text-xs font-black text-[#00C41C]">
-            {(coinA?.symbol || match.coin_a_mint.slice(0, 4)).slice(0, 2).toUpperCase()}
-          </div>
-          <div className="font-black text-white text-sm">{coinA?.symbol || match.coin_a_mint.slice(0, 8)}</div>
-          <div className="text-gray-500 text-xs">{coinA?.name || 'Unknown'}</div>
-          {isCompleted && (
-            <div className="mt-2 text-xs font-bold">
-              Score: <span className="text-[#00C41C]">{match.coin_a_score.toFixed(1)}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <a
+              href={'https://bags.fm/token/' + match.coin_a_mint}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <CoinAvatar coin={coinA} mint={match.coin_a_mint} />
+            </a>
+            <div>
+              <div style={{ color: 'white', fontWeight: 900, fontSize: 14 }}>{coinA?.symbol || match.coin_a_mint.slice(0, 8)}</div>
+              <div style={{ color: '#6B7280', fontSize: 12 }}>{coinA?.name || 'Unknown'}</div>
             </div>
-          )}
-          {selected === match.coin_a_mint && !isCompleted && (
-            <div className="mt-2 text-[#00C41C] text-xs font-bold">✓ SELECTED</div>
-          )}
+          </div>
+          {isCompleted && <div style={{ fontSize: 11, fontWeight: 700, color: '#00C41C' }}>Score: {match.coin_a_score?.toFixed(1)}</div>}
+          {selected === match.coin_a_mint && !isCompleted && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>✓ SELECTED</div>}
         </button>
 
-        <div className="text-[#C8A84B] font-black text-lg shrink-0">VS</div>
+        <div style={{ color: '#C8A84B', fontWeight: 900, fontSize: 18, flexShrink: 0 }}>VS</div>
 
         <button
           disabled={!connected || submitted || isCompleted}
           onClick={() => onPredict(match.id, match.coin_b_mint)}
-          className={`flex-1 bg-[#111] border-2 rounded-xl p-4 text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-            selected === match.coin_b_mint
-              ? 'border-[#00C41C] bg-[#00C41C]/10'
-              : match.winner_mint === match.coin_b_mint
-              ? 'border-[#C8A84B] bg-[#C8A84B]/10'
-              : 'border-transparent hover:border-[#00C41C]/50'
-          }`}
+          style={{ flex: 1, background: bgB, border: borderB, borderRadius: 12, padding: 16, textAlign: 'left', cursor: connected && !submitted && !isCompleted ? 'pointer' : 'not-allowed', opacity: !connected ? 0.4 : 1 }}
         >
-          <div className="w-10 h-10 rounded-full bg-[#00C41C]/20 flex items-center justify-center mb-3 text-xs font-black text-[#00C41C]">
-            {(coinB?.symbol || match.coin_b_mint.slice(0, 4)).slice(0, 2).toUpperCase()}
-          </div>
-          <div className="font-black text-white text-sm">{coinB?.symbol || match.coin_b_mint.slice(0, 8)}</div>
-          <div className="text-gray-500 text-xs">{coinB?.name || 'Unknown'}</div>
-          {isCompleted && (
-            <div className="mt-2 text-xs font-bold">
-              Score: <span className="text-[#00C41C]">{match.coin_b_score.toFixed(1)}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <a
+              href={'https://bags.fm/token/' + match.coin_b_mint}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <CoinAvatar coin={coinB} mint={match.coin_b_mint} />
+            </a>
+            <div>
+              <div style={{ color: 'white', fontWeight: 900, fontSize: 14 }}>{coinB?.symbol || match.coin_b_mint.slice(0, 8)}</div>
+              <div style={{ color: '#6B7280', fontSize: 12 }}>{coinB?.name || 'Unknown'}</div>
             </div>
-          )}
-          {selected === match.coin_b_mint && !isCompleted && (
-            <div className="mt-2 text-[#00C41C] text-xs font-bold">✓ SELECTED</div>
-          )}
+          </div>
+          {isCompleted && <div style={{ fontSize: 11, fontWeight: 700, color: '#00C41C' }}>Score: {match.coin_b_score?.toFixed(1)}</div>}
+          {selected === match.coin_b_mint && !isCompleted && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>✓ SELECTED</div>}
         </button>
       </div>
 
       {!connected && (
-        <p className="text-center text-gray-600 text-xs mt-3">Connect wallet to predict</p>
+        <p style={{ textAlign: 'center', color: '#6B7280', fontSize: 12, marginTop: 12 }}>Connect wallet to predict</p>
       )}
     </div>
   )
@@ -156,7 +197,7 @@ export default function ArenaPage() {
       const res = await fetch('/api/arena')
       const data = await res.json()
       setArena(data.arena)
-    } catch (e) {
+    } catch {
       setError('Failed to load arena')
     } finally {
       setLoading(false)
@@ -166,7 +207,7 @@ export default function ArenaPage() {
   async function fetchExistingPredictions() {
     if (!publicKey || !arena) return
     try {
-      const res = await fetch(`/api/predictions?wallet=${publicKey.toString()}&arena_id=${arena.id}`)
+      const res = await fetch('/api/predictions?wallet=' + publicKey.toString() + '&arena_id=' + arena.id)
       const data = await res.json()
       if (data.predictions && data.predictions.length > 0) {
         const map: { [matchId: string]: string } = {}
@@ -176,7 +217,7 @@ export default function ArenaPage() {
         setPredictions(map)
         setSubmitted(true)
       }
-    } catch (e) {
+    } catch {
       console.error('Failed to fetch predictions')
     }
   }
@@ -206,7 +247,7 @@ export default function ArenaPage() {
       } else {
         setError('Failed to submit predictions')
       }
-    } catch (e) {
+    } catch {
       setError('Failed to submit predictions')
     } finally {
       setSubmitting(false)
@@ -267,23 +308,23 @@ export default function ArenaPage() {
         <div className="flex items-center justify-between mb-10">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <span className={`w-2 h-2 rounded-full ${predictionOpen ? 'bg-[#00C41C] animate-pulse' : 'bg-yellow-500'}`} />
-              <span className={`text-xs font-bold tracking-widest uppercase ${predictionOpen ? 'text-[#00C41C]' : 'text-yellow-500'}`}>
+              <span className={'w-2 h-2 rounded-full ' + (predictionOpen ? 'bg-[#00C41C] animate-pulse' : 'bg-yellow-500')} />
+              <span className={'text-xs font-bold tracking-widest uppercase ' + (predictionOpen ? 'text-[#00C41C]' : 'text-yellow-500')}>
                 {predictionOpen ? 'Prediction Window Open' : 'Arena Live — Predictions Closed'}
               </span>
             </div>
-            <h1 className="text-5xl font-black tracking-tight">Battle <span className="text-[#00C41C]">ARENA</span></h1>
+            <h1 className="text-5xl font-black tracking-tight">BATTLE <span className="text-[#00C41C]">ARENA</span></h1>
             <p className="text-gray-500 mt-2">
               {predictionOpen
-                ? `Predictions close at ${new Date(arena.prediction_closes_at).toUTCString()}`
-                : `Arena ends at ${new Date(arena.ends_at).toUTCString()}`}
+                ? 'Predictions close at ' + new Date(arena.prediction_closes_at).toUTCString()
+                : 'Arena ends at ' + new Date(arena.ends_at).toUTCString()}
             </p>
           </div>
         </div>
 
         {submitted && (
           <div className="bg-[#00C41C]/10 border border-[#00C41C]/40 rounded-xl p-4 mb-8 text-center">
-            <span className="text-[#00C41C] font-black">✓ Predictions submitted! Good luck!</span>
+            <span className="text-[#00C41C] font-black">Predictions submitted! Good luck!</span>
           </div>
         )}
 
@@ -297,7 +338,7 @@ export default function ArenaPage() {
           <div className="bg-[#0A0A0A] border border-[#00C41C]/20 rounded-xl p-4 mb-10 flex items-center justify-between">
             <span className="text-gray-400 text-sm">Your predictions: <span className="text-white font-black">{totalPredicted}/{totalMatches}</span></span>
             <div className="flex-1 mx-6 bg-[#111] rounded-full h-2">
-              <div className="h-2 rounded-full bg-[#00C41C] transition-all" style={{ width: `${totalMatches > 0 ? (totalPredicted / totalMatches) * 100 : 0}%` }} />
+              <div className="h-2 rounded-full bg-[#00C41C] transition-all" style={{ width: (totalMatches > 0 ? (totalPredicted / totalMatches) * 100 : 0) + '%' }} />
             </div>
             <span className="text-[#00C41C] font-black text-sm">{totalMatches > 0 ? Math.round((totalPredicted / totalMatches) * 100) : 0}%</span>
           </div>
@@ -311,7 +352,7 @@ export default function ArenaPage() {
               <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">
                 {round === 1 ? '⚔️' : round === 2 ? '🏆' : round === 3 ? '🔥' : '👑'} {ROUND_LABELS[round]}
               </h2>
-              <div className={`grid gap-4 ${round <= 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 max-w-md'}`}>
+              <div className={'grid gap-4 ' + (round <= 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 max-w-md')}>
                 {matches.map((match) => (
                   <MatchCard
                     key={match.id}
@@ -339,7 +380,7 @@ export default function ArenaPage() {
             </button>
             <p className="text-gray-600 text-sm mt-3">
               {totalPredicted < totalMatches
-                ? `Pick ${totalMatches - totalPredicted} more to submit`
+                ? 'Pick ' + (totalMatches - totalPredicted) + ' more to submit'
                 : 'All predictions ready — submit is final!'}
             </p>
           </div>
