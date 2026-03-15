@@ -17,8 +17,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <WalletContextProvider>
+<body className={inter.className} suppressHydrationWarning>        <WalletContextProvider>
           {children}
         </WalletContextProvider>
       </body>

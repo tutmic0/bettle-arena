@@ -1,10 +1,17 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import Image from 'next/image'
 import Link from 'next/link'
 
 export default function Navbar() {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-[#00C41C]/20 bg-black/90 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -32,13 +39,15 @@ export default function Navbar() {
           <Link href="/profile" className="text-gray-400 hover:text-[#00C41C] transition-colors text-sm font-semibold tracking-wide">
             PROFILE
           </Link>
-          <WalletMultiButton style={{
-            backgroundColor: '#00C41C',
-            color: '#000000',
-            fontWeight: '700',
-            borderRadius: '8px',
-            fontSize: '14px',
-          }} />
+          {mounted && (
+            <WalletMultiButton style={{
+              backgroundColor: '#00C41C',
+              color: '#000000',
+              fontWeight: '700',
+              borderRadius: '8px',
+              fontSize: '14px',
+            }} />
+          )}
         </div>
 
       </div>
