@@ -1,0 +1,21 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/form-arena",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/cron/snapshot",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/finalize-arena",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}
+```
+
+I dodaj u `.env.local`:
+```
+CRON_SECRET=neki_random_string_koji_ti_izmislis
