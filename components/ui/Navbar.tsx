@@ -33,6 +33,9 @@ export default function Navbar() {
           <Link href="/arena" className="text-gray-400 hover:text-[#00C41C] transition-colors text-sm font-semibold tracking-wide">
             ARENA
           </Link>
+          <Link href="/about" className="text-gray-400 hover:text-[#00C41C] transition-colors text-sm font-semibold tracking-wide">
+  ABOUT
+</Link>
           <Link href="/leaderboard" className="text-gray-400 hover:text-[#00C41C] transition-colors text-sm font-semibold tracking-wide">
             LEADERBOARD
           </Link>
