@@ -5,6 +5,9 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import Image from 'next/image'
 import Link from 'next/link'
 
+const ARENA_MINT = process.env.NEXT_PUBLIC_ARENA_TOKEN_MINT || ''
+const BUY_URL = ARENA_MINT ? 'https://bags.fm/token/' + ARENA_MINT : 'https://bags.fm'
+
 export default function Navbar() {
   const [mounted, setMounted] = useState(false)
 
@@ -15,33 +18,41 @@ export default function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-[#00C41C]/20 bg-black/90 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        
+
         <Link href="/" className="flex items-center gap-3">
           <Image
             src="/logo.png"
-            alt="Battle"
+            alt="Battle Arena"
             width={40}
             height={40}
             className="rounded-full"
           />
           <span className="text-white font-black text-xl tracking-wider">
-            Battle
+            BATTLE
           </span>
         </Link>
 
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-6">
           <Link href="/arena" className="text-gray-400 hover:text-[#00C41C] transition-colors text-sm font-semibold tracking-wide">
             ARENA
           </Link>
-          <Link href="/about" className="text-gray-400 hover:text-[#00C41C] transition-colors text-sm font-semibold tracking-wide">
-  ABOUT
-</Link>
           <Link href="/leaderboard" className="text-gray-400 hover:text-[#00C41C] transition-colors text-sm font-semibold tracking-wide">
             LEADERBOARD
           </Link>
           <Link href="/profile" className="text-gray-400 hover:text-[#00C41C] transition-colors text-sm font-semibold tracking-wide">
             PROFILE
           </Link>
+          <Link href="/about" className="text-gray-400 hover:text-[#00C41C] transition-colors text-sm font-semibold tracking-wide">
+            ABOUT
+          </Link>
+          <a
+            href={BUY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border border-[#00C41C]/40 text-[#00C41C] font-bold px-4 py-2 rounded-lg text-sm hover:bg-[#00C41C]/10 transition-all"
+          >
+            Buy $ARENA
+          </a>
           {mounted && (
             <WalletMultiButton style={{
               backgroundColor: '#00C41C',
