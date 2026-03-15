@@ -55,10 +55,6 @@ function CoinAvatar({ coin, mint }: { coin?: Coin; mint: string }) {
         onError={(e) => {
           const target = e.target as HTMLImageElement
           target.style.display = 'none'
-          const parent = target.parentElement
-          if (parent) {
-            parent.innerHTML = '<div style="width:40px;height:40px;border-radius:50%;background:rgba(0,196,28,0.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#00C41C">' + initials + '</div>'
-          }
         }}
       />
     )
@@ -78,6 +74,7 @@ function MatchCard({
   onPredict,
   connected,
   submitted,
+  eligible,
 }: {
   match: Match
   coins: { [mint: string]: Coin }
@@ -85,25 +82,17 @@ function MatchCard({
   onPredict: (matchId: string, mint: string) => void
   connected: boolean
   submitted: boolean
+  eligible: boolean
 }) {
   const coinA = coins[match.coin_a_mint]
   const coinB = coins[match.coin_b_mint]
   const selected = predictions[match.id]
   const isCompleted = match.status === 'completed'
   const points = POINTS_MAP[match.round]
+  const canPredict = connected && !submitted && !isCompleted && eligible
 
-  const borderA = selected === match.coin_a_mint
-    ? '2px solid #00C41C'
-    : match.winner_mint === match.coin_a_mint
-    ? '2px solid #C8A84B'
-    : '2px solid transparent'
-
-  const borderB = selected === match.coin_b_mint
-    ? '2px solid #00C41C'
-    : match.winner_mint === match.coin_b_mint
-    ? '2px solid #C8A84B'
-    : '2px solid transparent'
-
+  const borderA = selected === match.coin_a_mint ? '2px solid #00C41C' : match.winner_mint === match.coin_a_mint ? '2px solid #C8A84B' : '2px solid transparent'
+  const borderB = selected === match.coin_b_mint ? '2px solid #00C41C' : match.winner_mint === match.coin_b_mint ? '2px solid #C8A84B' : '2px solid transparent'
   const bgA = selected === match.coin_a_mint ? 'rgba(0,196,28,0.1)' : match.winner_mint === match.coin_a_mint ? 'rgba(200,168,75,0.1)' : '#111'
   const bgB = selected === match.coin_b_mint ? 'rgba(0,196,28,0.1)' : match.winner_mint === match.coin_b_mint ? 'rgba(200,168,75,0.1)' : '#111'
 
@@ -118,17 +107,12 @@ function MatchCard({
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <button
-          disabled={!connected || submitted || isCompleted}
+          disabled={!canPredict}
           onClick={() => onPredict(match.id, match.coin_a_mint)}
-          style={{ flex: 1, background: bgA, border: borderA, borderRadius: 12, padding: 16, textAlign: 'left', cursor: connected && !submitted && !isCompleted ? 'pointer' : 'not-allowed', opacity: !connected ? 0.4 : 1 }}
+          style={{ flex: 1, background: bgA, border: borderA, borderRadius: 12, padding: 16, textAlign: 'left', cursor: canPredict ? 'pointer' : 'not-allowed', opacity: !connected || !eligible ? 0.5 : 1 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <a
-              href={'https://bags.fm/token/' + match.coin_a_mint}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <a href={'https://bags.fm/token/' + match.coin_a_mint} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
               <CoinAvatar coin={coinA} mint={match.coin_a_mint} />
             </a>
             <div>
@@ -137,23 +121,18 @@ function MatchCard({
             </div>
           </div>
           {isCompleted && <div style={{ fontSize: 11, fontWeight: 700, color: '#00C41C' }}>Score: {match.coin_a_score?.toFixed(1)}</div>}
-          {selected === match.coin_a_mint && !isCompleted && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>✓ SELECTED</div>}
+          {selected === match.coin_a_mint && !isCompleted && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>SELECTED</div>}
         </button>
 
         <div style={{ color: '#C8A84B', fontWeight: 900, fontSize: 18, flexShrink: 0 }}>VS</div>
 
         <button
-          disabled={!connected || submitted || isCompleted}
+          disabled={!canPredict}
           onClick={() => onPredict(match.id, match.coin_b_mint)}
-          style={{ flex: 1, background: bgB, border: borderB, borderRadius: 12, padding: 16, textAlign: 'left', cursor: connected && !submitted && !isCompleted ? 'pointer' : 'not-allowed', opacity: !connected ? 0.4 : 1 }}
+          style={{ flex: 1, background: bgB, border: borderB, borderRadius: 12, padding: 16, textAlign: 'left', cursor: canPredict ? 'pointer' : 'not-allowed', opacity: !connected || !eligible ? 0.5 : 1 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <a
-              href={'https://bags.fm/token/' + match.coin_b_mint}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <a href={'https://bags.fm/token/' + match.coin_b_mint} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
               <CoinAvatar coin={coinB} mint={match.coin_b_mint} />
             </a>
             <div>
@@ -162,7 +141,7 @@ function MatchCard({
             </div>
           </div>
           {isCompleted && <div style={{ fontSize: 11, fontWeight: 700, color: '#00C41C' }}>Score: {match.coin_b_score?.toFixed(1)}</div>}
-          {selected === match.coin_b_mint && !isCompleted && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>✓ SELECTED</div>}
+          {selected === match.coin_b_mint && !isCompleted && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>SELECTED</div>}
         </button>
       </div>
 
@@ -181,6 +160,8 @@ export default function ArenaPage() {
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [eligible, setEligible] = useState<boolean>(true)
+  const [eligibilityChecked, setEligibilityChecked] = useState<boolean>(false)
 
   useEffect(() => {
     fetchArena()
@@ -191,6 +172,25 @@ export default function ArenaPage() {
       fetchExistingPredictions()
     }
   }, [connected, publicKey, arena])
+
+  useEffect(() => {
+    if (connected && publicKey) {
+      checkEligibility()
+    }
+  }, [connected, publicKey])
+
+  async function checkEligibility() {
+    if (!publicKey) return
+    try {
+      const res = await fetch('/api/check-eligibility?wallet=' + publicKey.toString())
+      const data = await res.json()
+      setEligible(data.eligible)
+      setEligibilityChecked(true)
+    } catch {
+      setEligible(true)
+      setEligibilityChecked(true)
+    }
+  }
 
   async function fetchArena() {
     try {
@@ -328,6 +328,21 @@ export default function ArenaPage() {
           </div>
         )}
 
+        {connected && eligibilityChecked && !eligible && (
+          <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-8 text-center">
+            <span className="text-red-400 font-black">
+              You need at least 1,000 $ARENA tokens to predict.{' '}
+              <a href="https://bags.fm" target="_blank" rel="noopener noreferrer" className="underline ml-1">Get $ARENA</a>
+            </span>
+          </div>
+        )}
+
+        {connected && eligibilityChecked && eligible && !submitted && (
+          <div className="bg-[#00C41C]/10 border border-[#00C41C]/30 rounded-xl p-3 mb-8 text-center">
+            <span className="text-[#00C41C] text-sm font-bold">Eligible to predict</span>
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-8 text-center">
             <span className="text-red-400 font-bold">{error}</span>
@@ -362,6 +377,7 @@ export default function ArenaPage() {
                     onPredict={handlePrediction}
                     connected={connected}
                     submitted={submitted}
+                    eligible={eligible}
                   />
                 ))}
               </div>
@@ -373,13 +389,15 @@ export default function ArenaPage() {
           <div className="text-center mt-10">
             <button
               onClick={handleSubmit}
-              disabled={totalPredicted < totalMatches || submitting}
+              disabled={totalPredicted < totalMatches || submitting || !eligible}
               className="bg-[#00C41C] text-black font-black px-16 py-5 rounded-xl text-xl hover:bg-[#00E620] transition-all hover:scale-105 hover:shadow-[0_0_40px_rgba(0,196,28,0.4)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              {submitting ? 'SUBMITTING...' : 'SUBMIT PREDICTIONS ⚔️'}
+              {submitting ? 'SUBMITTING...' : 'SUBMIT PREDICTIONS'}
             </button>
             <p className="text-gray-600 text-sm mt-3">
-              {totalPredicted < totalMatches
+              {!eligible
+                ? 'You need $ARENA tokens to submit'
+                : totalPredicted < totalMatches
                 ? 'Pick ' + (totalMatches - totalPredicted) + ' more to submit'
                 : 'All predictions ready — submit is final!'}
             </p>
