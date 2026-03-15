@@ -320,6 +320,7 @@ export default function ArenaPage() {
                 label={predictionOpen ? 'Predictions close in' : 'Arena ends in'}
               />
             </div>
+          </div>
         </div>
 
         {submitted && (
