@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getBagsPools } from '@/lib/bags'
 import { getTokenHolders, getTokenTransactions } from '@/lib/helius'
-
+import { getTokenHolders, getTokenTransactions, getTokenMetadata } from '@/lib/helius'
 export async function GET(req: NextRequest) {
   try {
     // Provjeri auth header
@@ -30,13 +30,15 @@ export async function GET(req: NextRequest) {
           const txCount = transactions?.length || 0
           const selectionScore = (uniqueWallets * 0.4) + (txCount * 0.4)
 
-          return {
-            token_mint: pool.tokenMint,
-            name: pool.tokenMint.slice(0, 6),
-            symbol: pool.tokenMint.slice(0, 4).toUpperCase(),
-            selection_score: selectionScore,
-            unique_wallets: uniqueWallets,
-          }
+          const metadata = await getTokenMetadata(pool.tokenMint)
+return {
+  token_mint: pool.tokenMint,
+  name: metadata?.name || pool.tokenMint.slice(0, 6),
+  symbol: metadata?.symbol || pool.tokenMint.slice(0, 4).toUpperCase(),
+  image_url: metadata?.image || null,
+  selection_score: selectionScore,
+  unique_wallets: uniqueWallets,
+}
         } catch {
           return null
         }

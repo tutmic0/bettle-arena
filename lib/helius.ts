@@ -51,3 +51,24 @@ export async function getTokenBalance(
   if (!accounts || accounts.length === 0) return 0
   return accounts[0].account.data.parsed.info.tokenAmount.uiAmount
 }
+
+export async function getTokenMetadata(tokenMint: string) {
+  const response = await fetch(HELIUS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'getAsset',
+      params: { id: tokenMint }
+    })
+  })
+  const data = await response.json()
+  const result = data.result
+  if (!result) return null
+  return {
+    name: result.content?.metadata?.name || tokenMint.slice(0, 6),
+    symbol: result.content?.metadata?.symbol || tokenMint.slice(0, 4).toUpperCase(),
+    image: result.content?.links?.image || result.content?.files?.[0]?.uri || null,
+  }
+}
