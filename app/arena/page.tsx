@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Navbar from '@/components/ui/Navbar'
 import { useWallet } from '@solana/wallet-adapter-react'
-
+import Countdown from '@/components/ui/Countdown'
 interface Coin {
   token_mint: string
   name: string
@@ -314,12 +314,12 @@ export default function ArenaPage() {
               </span>
             </div>
             <h1 className="text-5xl font-black tracking-tight">BATTLE <span className="text-[#00C41C]">ARENA</span></h1>
-            <p className="text-gray-500 mt-2">
-              {predictionOpen
-                ? 'Predictions close at ' + new Date(arena.prediction_closes_at).toUTCString()
-                : 'Arena ends at ' + new Date(arena.ends_at).toUTCString()}
-            </p>
-          </div>
+            <div className="mt-2">
+              <Countdown
+                targetDate={predictionOpen ? arena.prediction_closes_at : arena.ends_at}
+                label={predictionOpen ? 'Predictions close in' : 'Arena ends in'}
+              />
+            </div>
         </div>
 
         {submitted && (
