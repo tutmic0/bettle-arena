@@ -154,7 +154,7 @@ function MatchCard({
               <div style={{ color: '#6B7280', fontSize: 12 }}>{coinA?.name || 'Unknown'}</div>
             </div>
           </div>
-          {selected === coinAMint && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>✓ SELECTED</div>}
+          {selected === coinAMint && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>SELECTED</div>}
         </button>
 
         <div style={{ color: '#C8A84B', fontWeight: 900, fontSize: 18, flexShrink: 0 }}>VS</div>
@@ -173,7 +173,7 @@ function MatchCard({
               <div style={{ color: '#6B7280', fontSize: 12 }}>{coinB?.name || 'Unknown'}</div>
             </div>
           </div>
-          {selected === coinBMint && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>✓ SELECTED</div>}
+          {selected === coinBMint && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>SELECTED</div>}
         </button>
       </div>
 
@@ -194,7 +194,7 @@ export default function ArenaPage() {
   const [error, setError] = useState<string | null>(null)
   const [eligible, setEligible] = useState<boolean>(true)
   const [eligibilityChecked, setEligibilityChecked] = useState<boolean>(false)
-  const [minUsd, setMinUsd] = useState<number>(50)
+  const [minSol, setMinSol] = useState<number>(0.2)
 
   useEffect(() => {
     fetchArena()
@@ -218,7 +218,7 @@ export default function ArenaPage() {
       const res = await fetch('/api/check-eligibility?wallet=' + publicKey.toString())
       const data = await res.json()
       setEligible(data.eligible)
-      setMinUsd(data.required_usd || 50)
+      setMinSol(data.required_sol || 0.2)
       setEligibilityChecked(true)
     } catch {
       setEligible(true)
@@ -389,7 +389,7 @@ export default function ArenaPage() {
         {connected && eligibilityChecked && !eligible && (
           <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-8 text-center">
             <span className="text-red-400 font-black">
-              You need at least ${minUsd} worth of $ARENA tokens to predict.{' '}
+              You need at least {minSol} SOL worth of $ARENA tokens to predict.{' '}
               <a href={BUY_URL} target="_blank" rel="noopener noreferrer" className="underline ml-1">Buy $ARENA</a>
             </span>
           </div>
@@ -397,7 +397,7 @@ export default function ArenaPage() {
 
         {connected && eligibilityChecked && eligible && !submitted && (
           <div className="bg-[#00C41C]/10 border border-[#00C41C]/30 rounded-xl p-3 mb-8 text-center">
-            <span className="text-[#00C41C] text-sm font-bold">✓ Eligible to predict</span>
+            <span className="text-[#00C41C] text-sm font-bold">Eligible to predict</span>
           </div>
         )}
 
@@ -417,7 +417,6 @@ export default function ArenaPage() {
           </div>
         )}
 
-        {/* Round 1 */}
         <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">⚔️ {ROUND_LABELS[1]}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
           {r1Matches.map((match) => (
@@ -437,7 +436,6 @@ export default function ArenaPage() {
           ))}
         </div>
 
-        {/* Round 2 */}
         <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">🏆 {ROUND_LABELS[2]}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
           {r2Matches.map((match, i) => {
@@ -461,7 +459,6 @@ export default function ArenaPage() {
           })}
         </div>
 
-        {/* Semi Finals */}
         <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">🔥 {ROUND_LABELS[3]}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
           {sfMatches.map((match, i) => {
@@ -485,7 +482,6 @@ export default function ArenaPage() {
           })}
         </div>
 
-        {/* Final */}
         <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">👑 {ROUND_LABELS[4]}</h2>
         <div className="max-w-md mb-12">
           {finalMatch && (() => {
@@ -519,7 +515,7 @@ export default function ArenaPage() {
             </button>
             <p className="text-gray-600 text-sm mt-3">
               {!eligible
-                ? 'You need $' + minUsd + ' worth of $ARENA tokens to submit'
+                ? 'You need ' + minSol + ' SOL worth of $ARENA tokens to submit'
                 : totalPredicted < totalMatches
                 ? 'Pick ' + (totalMatches - totalPredicted) + ' more to submit'
                 : 'All predictions ready — submit is final!'}
