@@ -5,6 +5,13 @@ import Navbar from '@/components/ui/Navbar'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 
+interface Coin {
+  token_mint: string
+  name: string
+  symbol: string
+  image_url?: string
+}
+
 interface Prediction {
   id: string
   match_id: string
@@ -14,13 +21,6 @@ interface Prediction {
   is_correct: boolean | null
   points_earned: number
   created_at: string
-}
-
-interface Round {
-  id: string
-  round_number: number
-  status: string
-  date: string
 }
 
 interface LeaderboardEntry {
@@ -35,10 +35,27 @@ interface LeaderboardEntry {
 
 const DISTRIBUTION = [25, 18, 13, 10, 8, 7, 6, 5, 4, 4]
 
+function CoinDisplay({ mint, coinMap }: { mint: string; coinMap: { [k: string]: Coin } }) {
+  const coin = coinMap[mint]
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      {coin?.image_url ? (
+        <img src={coin.image_url} alt={coin.symbol} style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      ) : (
+        <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(0,196,28,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#00C41C' }}>
+          {(coin?.symbol || mint.slice(0, 2)).slice(0, 2).toUpperCase()}
+        </div>
+      )}
+      <span style={{ color: '#00C41C', fontWeight: 900, fontSize: 14 }}>{coin?.symbol || mint.slice(0, 8)}</span>
+    </div>
+  )
+}
+
 export default function ProfilePage() {
   const { connected, publicKey } = useWallet()
   const [predictions, setPredictions] = useState<Prediction[]>([])
-  const [currentRound, setCurrentRound] = useState<Round | null>(null)
+  const [coinMap, setCoinMap] = useState<{ [mint: string]: Coin }>({})
   const [todayEntry, setTodayEntry] = useState<LeaderboardEntry | null>(null)
   const [balance, setBalance] = useState<number>(0)
   const [eligible, setEligible] = useState<boolean>(true)
@@ -52,30 +69,45 @@ export default function ProfilePage() {
   async function fetchData() {
     if (!publicKey) return
     try {
-      const [eligRes, roundRes] = await Promise.all([
+      const today = new Date().toISOString().split('T')[0]
+
+      const [eligRes, roundsRes, lbRes] = await Promise.all([
         fetch('/api/check-eligibility?wallet=' + publicKey.toString()),
-        fetch('/api/round'),
+        fetch('/api/rounds-today?date=' + today),
+        fetch('/api/leaderboard?date=' + today),
       ])
 
       const eligData = await eligRes.json()
       setEligible(eligData.eligible)
       setBalance(eligData.balance || 0)
 
-      const roundData = await roundRes.json()
+      const roundsData = await roundsRes.json()
+      const rounds = roundsData.rounds || []
 
-      // Dohvati predictions iz svih rundi danas
-      const today = new Date().toISOString().split('T')[0]
-      const { rounds, predictions } = await fetchTodayPredictions(publicKey.toString(), today)
+      // Dohvati predictions i coin mapu za svaku rundu
+      const allPredictions: Prediction[] = []
+      const allCoins: { [mint: string]: Coin } = {}
 
-      setPredictions(predictions)
+      for (const round of rounds) {
+        const [predRes, roundDetailRes] = await Promise.all([
+          fetch('/api/predictions?wallet=' + publicKey.toString() + '&round_id=' + round.id),
+          fetch('/api/round-detail?round_id=' + round.id),
+        ])
 
-      // Postavi current round
-      if (roundData.round) {
-        setCurrentRound(roundData.round)
+        const predData = await predRes.json()
+        const roundDetail = await roundDetailRes.json()
+
+        allPredictions.push(...(predData.predictions || []))
+
+        // Dodaj coinove u mapu
+        for (const coin of roundDetail.coins || []) {
+          allCoins[coin.token_mint] = coin
+        }
       }
 
-      // Dohvati leaderboard za danas
-      const lbRes = await fetch('/api/leaderboard?date=' + today)
+      setPredictions(allPredictions)
+      setCoinMap(allCoins)
+
       const lbData = await lbRes.json()
       const myEntry = (lbData.leaderboard || []).find((e: any) => e.wallet_address === publicKey.toString())
       if (myEntry) setTodayEntry(myEntry)
@@ -85,23 +117,6 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  async function fetchTodayPredictions(wallet: string, date: string) {
-    // Dohvati sve runde za danas
-    const roundsRes = await fetch('/api/rounds-today?date=' + date)
-    const roundsData = await roundsRes.json()
-    const rounds = roundsData.rounds || []
-
-    // Dohvati predictions za svaku rundu
-    const allPredictions: Prediction[] = []
-    for (const round of rounds) {
-      const predRes = await fetch('/api/predictions?wallet=' + wallet + '&round_id=' + round.id)
-      const predData = await predRes.json()
-      allPredictions.push(...(predData.predictions || []))
-    }
-
-    return { rounds, predictions: allPredictions }
   }
 
   if (!connected) {
@@ -139,7 +154,6 @@ export default function ProfilePage() {
 
       <div className="max-w-4xl mx-auto px-6 pt-24 pb-16">
 
-        {/* Wallet info */}
         <div className="bg-[#0A0A0A] border border-[#00C41C]/20 rounded-xl p-8 mb-8 flex items-center gap-6">
           <div className="w-20 h-20 rounded-full bg-[#00C41C]/20 border-2 border-[#00C41C]/40 flex items-center justify-center text-3xl">⚔️</div>
           <div className="flex-1">
@@ -162,7 +176,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Today's stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
             { label: 'Predictions Today', value: predictions.length.toString() },
@@ -177,7 +190,6 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {/* Today's leaderboard position */}
         {todayEntry && (
           <div className="bg-[#00C41C]/10 border border-[#00C41C]/30 rounded-xl p-5 mb-8">
             <div className="text-[#00C41C] text-xs font-bold uppercase tracking-wider mb-3">Today's Position</div>
@@ -199,11 +211,8 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Predictions */}
         <div>
-          <h2 className="text-lg font-black tracking-widest uppercase mb-4 text-gray-400">
-            Today's Predictions
-          </h2>
+          <h2 className="text-lg font-black tracking-widest uppercase mb-4 text-gray-400">Today's Predictions</h2>
           {predictions.length === 0 ? (
             <div className="bg-[#0A0A0A] border border-[#00C41C]/20 rounded-xl p-8 text-center">
               <p className="text-gray-500">No predictions yet today.</p>
@@ -217,7 +226,7 @@ export default function ProfilePage() {
               </div>
               {predictions.map((p) => (
                 <div key={p.id} className="grid grid-cols-3 px-6 py-4 border-b border-[#00C41C]/10 last:border-0 items-center hover:bg-[#111] transition-all">
-                  <span className="text-[#00C41C] font-mono text-xs">{p.predicted_winner_mint.slice(0, 12)}...</span>
+                  <CoinDisplay mint={p.predicted_winner_mint} coinMap={coinMap} />
                   <span className="text-center">
                     {p.is_correct === null ? (
                       <span className="text-yellow-500 text-xs font-bold">PENDING</span>
