@@ -281,6 +281,13 @@ function ArenaSection({
               label={predictionOpen ? 'Predictions close in' : 'Arena ends in'}
             />
           </div>
+          {isActive && !predictionOpen && (
+  <div className="mt-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-3">
+    <p className="text-yellow-500 text-sm font-bold">
+      Next arena opens for predictions tonight at 21:00 UTC
+    </p>
+  </div>
+)}
         </div>
       </div>
 
