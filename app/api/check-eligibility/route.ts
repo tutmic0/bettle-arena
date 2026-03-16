@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTokenBalance } from '@/lib/helius'
+import { getTradeQuote } from '@/lib/bags'
 
 const ARENA_TOKEN_MINT = process.env.ARENA_TOKEN_MINT || null
-const MIN_BALANCE = parseInt(process.env.ARENA_MIN_BALANCE || '1000')
+const MIN_USD_VALUE = parseFloat(process.env.ARENA_MIN_USD_VALUE || '50')
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,15 +14,33 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Missing wallet' }, { status: 400 })
     }
 
-    // Ako token nije lansiran još, svi su eligible
     if (!ARENA_TOKEN_MINT) {
-      return NextResponse.json({ eligible: true, balance: 0, required: MIN_BALANCE, launched: false })
+      return NextResponse.json({ 
+        eligible: true, 
+        balance: 0, 
+        usd_value: 0,
+        required_usd: MIN_USD_VALUE,
+        launched: false 
+      })
     }
 
-    const balance = await getTokenBalance(wallet, ARENA_TOKEN_MINT)
-    const eligible = balance >= MIN_BALANCE
+    const [balance, quote] = await Promise.all([
+      getTokenBalance(wallet, ARENA_TOKEN_MINT),
+      getTradeQuote(ARENA_TOKEN_MINT)
+    ])
 
-    return NextResponse.json({ eligible, balance, required: MIN_BALANCE, launched: true })
+    const price = quote?.price || 0
+    const usdValue = balance * price
+    const eligible = usdValue >= MIN_USD_VALUE
+
+    return NextResponse.json({ 
+      eligible, 
+      balance, 
+      usd_value: usdValue,
+      price,
+      required_usd: MIN_USD_VALUE,
+      launched: true 
+    })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to check eligibility' }, { status: 500 })
   }
