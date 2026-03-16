@@ -10,7 +10,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Dohvati aktivnu arenu
     const { data: arena } = await supabaseAdmin
       .from('arenas')
       .select('*, matches(*)')
@@ -21,91 +20,127 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'No active arena' })
     }
 
-    const results = {
-      rounds_processed: [] as number[],
-      winners_set: 0,
-      predictions_updated: 0,
+    const results = { winners_set: 0, predictions_updated: 0, r2_updated: 0, sf_updated: 0 }
+
+    // Refresh matches after each update
+    async function getMatches() {
+      const { data } = await supabaseAdmin
+        .from('matches')
+        .select('*')
+        .eq('arena_id', arena.id)
+        .order('created_at', { ascending: true })
+      return data || []
     }
 
-    // Provjeri svaku rundu
+    let matches = await getMatches()
+
     for (const round of [1, 2, 3, 4]) {
-      const roundMatches = arena.matches.filter((m: any) => m.round === round)
+      const roundMatches = matches.filter((m: any) => m.round === round)
       if (roundMatches.length === 0) continue
 
-      // Provjeri da li svi mečevi u rundi imaju dovoljno snapshota
-      // R1 — nakon 1 snapshota možemo proglasiti pobjednike
-      // R2 — nakon 2 snapshota
-      // SF — nakon 3 snapshota  
-      // Final — nakon 4 snapshota (cijela arena završena)
-      const requiredSnapshots = round
-
       for (const match of roundMatches) {
-        // Preskoči ako već ima pobjednika
         if (match.winner_mint) continue
-
-        // Preskoči TBD mečeve
         if (match.coin_a_mint.startsWith('TBD') || match.coin_b_mint.startsWith('TBD')) continue
 
-        // Provjeri koliko snapshota ima ovaj meč
         const { count } = await supabaseAdmin
           .from('snapshots')
           .select('id', { count: 'exact' })
           .eq('match_id', match.id)
 
-        const snapshotCount = Math.floor((count || 0) / 2)
+        if ((count || 0) < 2) continue
 
-        if (snapshotCount < requiredSnapshots) continue
-
-        // Odredi pobjednika na osnovu prosječnog scorea
         const winner = match.coin_a_score >= match.coin_b_score
           ? match.coin_a_mint
           : match.coin_b_mint
 
-        // Postavi pobjednika
         await supabaseAdmin
           .from('matches')
-          .update({
-            winner_mint: winner,
-            status: 'completed',
-          })
+          .update({ winner_mint: winner, status: 'completed' })
           .eq('id', match.id)
 
         results.winners_set++
 
-        // Ažuriraj predictions za ovaj meč
-        const { data: matchPredictions } = await supabaseAdmin
+        const { data: preds } = await supabaseAdmin
           .from('predictions')
           .select('*')
           .eq('match_id', match.id)
 
-        for (const pred of matchPredictions || []) {
+        for (const pred of preds || []) {
           const isCorrect = pred.predicted_winner_mint === winner
-          const points = isCorrect ? POINTS_MAP[round] : 0
-
           await supabaseAdmin
             .from('predictions')
             .update({
               actual_winner_mint: winner,
               is_correct: isCorrect,
-              points_earned: points,
+              points_earned: isCorrect ? POINTS_MAP[round] : 0,
             })
             .eq('id', pred.id)
-
           results.predictions_updated++
         }
       }
 
-      results.rounds_processed.push(round)
+      // Refresh matches after processing round
+      matches = await getMatches()
+
+      // After R1 — populate R2
+      if (round === 1) {
+        const r1 = matches.filter((m: any) => m.round === 1)
+        const r2 = matches.filter((m: any) => m.round === 2)
+        for (let i = 0; i < r2.length; i++) {
+          const m1 = r1[i * 2]
+          const m2 = r1[i * 2 + 1]
+          if (!m1?.winner_mint || !m2?.winner_mint) continue
+          if (r2[i].coin_a_mint.startsWith('TBD')) {
+            await supabaseAdmin.from('matches').update({
+              coin_a_mint: m1.winner_mint,
+              coin_b_mint: m2.winner_mint,
+            }).eq('id', r2[i].id)
+            results.r2_updated++
+          }
+        }
+        matches = await getMatches()
+      }
+
+      // After R2 — populate SF
+      if (round === 2) {
+        const r2 = matches.filter((m: any) => m.round === 2)
+        const sf = matches.filter((m: any) => m.round === 3)
+        for (let i = 0; i < sf.length; i++) {
+          const m1 = r2[i * 2]
+          const m2 = r2[i * 2 + 1]
+          if (!m1?.winner_mint || !m2?.winner_mint) continue
+          if (sf[i].coin_a_mint.startsWith('TBD')) {
+            await supabaseAdmin.from('matches').update({
+              coin_a_mint: m1.winner_mint,
+              coin_b_mint: m2.winner_mint,
+            }).eq('id', sf[i].id)
+            results.sf_updated++
+          }
+        }
+        matches = await getMatches()
+      }
+
+      // After SF — populate Final
+      if (round === 3) {
+        const sf = matches.filter((m: any) => m.round === 3)
+        const final = matches.find((m: any) => m.round === 4)
+        if (final && sf[0]?.winner_mint && sf[1]?.winner_mint && final.coin_a_mint.startsWith('TBD')) {
+          await supabaseAdmin.from('matches').update({
+            coin_a_mint: sf[0].winner_mint,
+            coin_b_mint: sf[1].winner_mint,
+          }).eq('id', final.id)
+        }
+        matches = await getMatches()
+      }
     }
 
-    // Ažuriraj leaderboard
+    // Update leaderboard
     const { data: allPredictions } = await supabaseAdmin
       .from('predictions')
       .select('*')
       .eq('arena_id', arena.id)
 
     const walletMap: { [wallet: string]: any } = {}
-
     for (const pred of allPredictions || []) {
       if (!walletMap[pred.wallet_address]) {
         walletMap[pred.wallet_address] = {
@@ -127,9 +162,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Rankiraj
     const DISTRIBUTION = [0.25, 0.18, 0.13, 0.10, 0.08, 0.07, 0.06, 0.05, 0.04, 0.04]
-
     const sorted = Object.values(walletMap).sort((a: any, b: any) => {
       if (b.total_points !== a.total_points) return b.total_points - a.total_points
       if (a.first_correct_at && b.first_correct_at) {
@@ -142,18 +175,13 @@ export async function GET(req: NextRequest) {
       const entry: any = sorted[i]
       entry.rank = i + 1
       entry.reward_amount = i < 10 ? DISTRIBUTION[i] : 0
-
       await supabaseAdmin
         .from('leaderboard')
         .upsert(entry, { onConflict: 'arena_id,wallet_address' })
     }
 
-    return NextResponse.json({
-      success: true,
-      ...results,
-      leaderboard_updated: sorted.length,
-    })
+    return NextResponse.json({ success: true, ...results, leaderboard_entries: sorted.length })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Round finalize failed' }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'Failed' }, { status: 500 })
   }
 }
