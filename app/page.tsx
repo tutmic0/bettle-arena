@@ -166,6 +166,9 @@ export default function Home() {
           <span className="text-white font-black tracking-wider">Battle ARENA</span>
         </div>
         <p className="text-gray-600 text-sm">Built on Bags.fm · Powered by Solana</p>
+<a href="https://x.com/tuuu995" target="_blank" rel="noopener noreferrer" className="text-gray-700 text-xs mt-1 hover:text-gray-500 transition-colors">
+  Created by tuuu995
+</a>
       </footer>
     </main>
   )
