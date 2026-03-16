@@ -1,24 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/cron/form-arena",
-      "schedule": "0 21 * * *"
+      "path": "/api/cron/create-round",
+      "schedule": "0 */4 * * *"
     },
     {
-      "path": "/api/cron/snapshot",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/finalize-arena",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/claim-vault",
-      "schedule": "1 9 * * *"
-    },
-    {
-      "path": "/api/cron/round-finalize",
-      "schedule": "30 */6 * * *"
+      "path": "/api/cron/finalize-round",
+      "schedule": "0 3-23/4 * * *"
     }
   ]
 }
