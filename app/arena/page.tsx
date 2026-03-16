@@ -5,6 +5,9 @@ import Navbar from '@/components/ui/Navbar'
 import Countdown from '@/components/ui/Countdown'
 import { useWallet } from '@solana/wallet-adapter-react'
 
+const ARENA_MINT = process.env.NEXT_PUBLIC_ARENA_TOKEN_MINT || ''
+const BUY_URL = ARENA_MINT ? 'https://bags.fm/' + ARENA_MINT : 'https://bags.fm'
+
 interface Coin {
   token_mint: string
   name: string
@@ -143,7 +146,7 @@ function MatchCard({
           style={{ flex: 1, background: bgA, border: borderA, borderRadius: 12, padding: 16, textAlign: 'left', cursor: canPredict ? 'pointer' : 'not-allowed', opacity: !connected || !eligible ? 0.5 : 1 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <a href={'https://bags.fm/token/' + coinAMint} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+            <a href={'https://bags.fm/' + coinAMint} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
               <CoinAvatar coin={coinA} mint={coinAMint} />
             </a>
             <div>
@@ -162,7 +165,7 @@ function MatchCard({
           style={{ flex: 1, background: bgB, border: borderB, borderRadius: 12, padding: 16, textAlign: 'left', cursor: canPredict ? 'pointer' : 'not-allowed', opacity: !connected || !eligible ? 0.5 : 1 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <a href={'https://bags.fm/token/' + coinBMint} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+            <a href={'https://bags.fm/' + coinBMint} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
               <CoinAvatar coin={coinB} mint={coinBMint} />
             </a>
             <div>
@@ -191,6 +194,7 @@ export default function ArenaPage() {
   const [error, setError] = useState<string | null>(null)
   const [eligible, setEligible] = useState<boolean>(true)
   const [eligibilityChecked, setEligibilityChecked] = useState<boolean>(false)
+  const [minUsd, setMinUsd] = useState<number>(50)
 
   useEffect(() => {
     fetchArena()
@@ -214,6 +218,7 @@ export default function ArenaPage() {
       const res = await fetch('/api/check-eligibility?wallet=' + publicKey.toString())
       const data = await res.json()
       setEligible(data.eligible)
+      setMinUsd(data.required_usd || 50)
       setEligibilityChecked(true)
     } catch {
       setEligible(true)
@@ -318,14 +323,11 @@ export default function ArenaPage() {
   const coinMap: { [mint: string]: Coin } = {}
   arena.arena_coins?.forEach((c) => { coinMap[c.token_mint] = c })
 
-  // Get Round 1 matches from DB
   const r1Matches = arena.matches?.filter(m => m.round === 1) || []
   const r2Matches = arena.matches?.filter(m => m.round === 2) || []
   const sfMatches = arena.matches?.filter(m => m.round === 3) || []
   const finalMatch = arena.matches?.find(m => m.round === 4)
 
-  // Build dynamic bracket from predictions
-  // R2: winners of R1 matches 0-1, 2-3, 4-5, 6-7
   const getR2Coins = (pairIndex: number) => {
     const m1 = r1Matches[pairIndex * 2]
     const m2 = r1Matches[pairIndex * 2 + 1]
@@ -334,7 +336,6 @@ export default function ArenaPage() {
     return { coinA: w1 || '', coinB: w2 || '' }
   }
 
-  // SF: winners of R2 matches 0-1, 2-3
   const getSFCoins = (pairIndex: number) => {
     const m1 = r2Matches[pairIndex * 2]
     const m2 = r2Matches[pairIndex * 2 + 1]
@@ -343,7 +344,6 @@ export default function ArenaPage() {
     return { coinA: w1 || '', coinB: w2 || '' }
   }
 
-  // Final: winners of SF matches
   const getFinalCoins = () => {
     const m1 = sfMatches[0]
     const m2 = sfMatches[1]
@@ -389,15 +389,15 @@ export default function ArenaPage() {
         {connected && eligibilityChecked && !eligible && (
           <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-8 text-center">
             <span className="text-red-400 font-black">
-              You need at least $20 worth of $ARENA tokens to predict.{' '}
-              <a href="https://bags.fm" target="_blank" rel="noopener noreferrer" className="underline ml-1">Get $ARENA</a>
+              You need at least ${minUsd} worth of $ARENA tokens to predict.{' '}
+              <a href={BUY_URL} target="_blank" rel="noopener noreferrer" className="underline ml-1">Buy $ARENA</a>
             </span>
           </div>
         )}
 
         {connected && eligibilityChecked && eligible && !submitted && (
           <div className="bg-[#00C41C]/10 border border-[#00C41C]/30 rounded-xl p-3 mb-8 text-center">
-            <span className="text-[#00C41C] text-sm font-bold">Eligible to predict</span>
+            <span className="text-[#00C41C] text-sm font-bold">✓ Eligible to predict</span>
           </div>
         )}
 
@@ -519,7 +519,7 @@ export default function ArenaPage() {
             </button>
             <p className="text-gray-600 text-sm mt-3">
               {!eligible
-                ? 'You need $ARENA tokens to submit'
+                ? 'You need $' + minUsd + ' worth of $ARENA tokens to submit'
                 : totalPredicted < totalMatches
                 ? 'Pick ' + (totalMatches - totalPredicted) + ' more to submit'
                 : 'All predictions ready — submit is final!'}
