@@ -389,7 +389,7 @@ export default function ArenaPage() {
         {connected && eligibilityChecked && !eligible && (
           <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-8 text-center">
             <span className="text-red-400 font-black">
-              You need at least 1,000 $ARENA tokens to predict.{' '}
+              You need at least $20 worth of $ARENA tokens to predict.{' '}
               <a href="https://bags.fm" target="_blank" rel="noopener noreferrer" className="underline ml-1">Get $ARENA</a>
             </span>
           </div>

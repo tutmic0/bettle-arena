@@ -6,7 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 const ARENA_MINT = process.env.NEXT_PUBLIC_ARENA_TOKEN_MINT || ''
-const BUY_URL = ARENA_MINT ? 'https://bags.fm/token/' + ARENA_MINT : 'https://bags.fm'
+const BUY_URL = ARENA_MINT ? 'https://bags.fm/' + ARENA_MINT : 'https://bags.fm'
 
 export default function Navbar() {
   const [mounted, setMounted] = useState(false)
