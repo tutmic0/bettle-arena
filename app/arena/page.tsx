@@ -83,6 +83,9 @@ function MatchCard({
   submitted,
   eligible,
   isPlaceholder,
+  winnerMint,
+  scoreA,
+  scoreB,
 }: {
   matchId: string
   coinAMint: string
@@ -95,6 +98,9 @@ function MatchCard({
   submitted: boolean
   eligible: boolean
   isPlaceholder?: boolean
+  winnerMint?: string
+  scoreA?: number
+  scoreB?: number
 }) {
   const coinA = coins[coinAMint]
   const coinB = coins[coinBMint]
@@ -102,10 +108,13 @@ function MatchCard({
   const points = POINTS_MAP[round]
   const canPredict = connected && !submitted && eligible && !isPlaceholder && !!coinAMint && !!coinBMint
 
-  const borderA = selected === coinAMint ? '2px solid #00C41C' : '2px solid transparent'
-  const borderB = selected === coinBMint ? '2px solid #00C41C' : '2px solid transparent'
-  const bgA = selected === coinAMint ? 'rgba(0,196,28,0.1)' : '#111'
-  const bgB = selected === coinBMint ? 'rgba(0,196,28,0.1)' : '#111'
+  const isWinnerA = winnerMint === coinAMint
+  const isWinnerB = winnerMint === coinBMint
+
+  const borderA = selected === coinAMint ? '2px solid #00C41C' : isWinnerA ? '2px solid #C8A84B' : '2px solid transparent'
+  const borderB = selected === coinBMint ? '2px solid #00C41C' : isWinnerB ? '2px solid #C8A84B' : '2px solid transparent'
+  const bgA = selected === coinAMint ? 'rgba(0,196,28,0.1)' : isWinnerA ? 'rgba(200,168,75,0.1)' : '#111'
+  const bgB = selected === coinBMint ? 'rgba(0,196,28,0.1)' : isWinnerB ? 'rgba(200,168,75,0.1)' : '#111'
 
   if (isPlaceholder || !coinAMint || !coinBMint) {
     return (
@@ -154,7 +163,11 @@ function MatchCard({
               <div style={{ color: '#6B7280', fontSize: 12 }}>{coinA?.name || 'Unknown'}</div>
             </div>
           </div>
-          {selected === coinAMint && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>SELECTED</div>}
+          {scoreA !== undefined && scoreA > 0 && (
+            <div style={{ fontSize: 11, color: '#00C41C', fontWeight: 700 }}>Score: {scoreA.toFixed(1)}</div>
+          )}
+          {isWinnerA && <div style={{ color: '#C8A84B', fontSize: 11, fontWeight: 700 }}>WINNER 👑</div>}
+          {selected === coinAMint && !isWinnerA && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>SELECTED</div>}
         </button>
 
         <div style={{ color: '#C8A84B', fontWeight: 900, fontSize: 18, flexShrink: 0 }}>VS</div>
@@ -173,7 +186,11 @@ function MatchCard({
               <div style={{ color: '#6B7280', fontSize: 12 }}>{coinB?.name || 'Unknown'}</div>
             </div>
           </div>
-          {selected === coinBMint && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>SELECTED</div>}
+          {scoreB !== undefined && scoreB > 0 && (
+            <div style={{ fontSize: 11, color: '#00C41C', fontWeight: 700 }}>Score: {scoreB.toFixed(1)}</div>
+          )}
+          {isWinnerB && <div style={{ color: '#C8A84B', fontSize: 11, fontWeight: 700 }}>WINNER 👑</div>}
+          {selected === coinBMint && !isWinnerB && <div style={{ color: '#00C41C', fontSize: 11, fontWeight: 700 }}>SELECTED</div>}
         </button>
       </div>
 
@@ -184,33 +201,283 @@ function MatchCard({
   )
 }
 
+function ArenaSection({
+  arena,
+  predictions,
+  onPredict,
+  connected,
+  submitted,
+  eligible,
+  minSol,
+  onSubmit,
+  submitting,
+}: {
+  arena: Arena
+  predictions: { [matchId: string]: string }
+  onPredict: (matchId: string, mint: string) => void
+  connected: boolean
+  submitted: boolean
+  eligible: boolean
+  minSol: number
+  onSubmit: () => void
+  submitting: boolean
+}) {
+  const coinMap: { [mint: string]: Coin } = {}
+  arena.arena_coins?.forEach((c) => { coinMap[c.token_mint] = c })
+
+  const r1Matches = arena.matches?.filter(m => m.round === 1) || []
+  const r2Matches = arena.matches?.filter(m => m.round === 2) || []
+  const sfMatches = arena.matches?.filter(m => m.round === 3) || []
+  const finalMatch = arena.matches?.find(m => m.round === 4)
+
+  const getR2Coins = (pairIndex: number) => {
+    const m1 = r1Matches[pairIndex * 2]
+    const m2 = r1Matches[pairIndex * 2 + 1]
+    // Use actual winner if match is completed, otherwise use prediction
+    const w1 = m1 ? (m1.winner_mint || predictions[m1.id] || '') : ''
+    const w2 = m2 ? (m2.winner_mint || predictions[m2.id] || '') : ''
+    return { coinA: w1, coinB: w2 }
+  }
+
+  const getSFCoins = (pairIndex: number) => {
+    const m1 = r2Matches[pairIndex * 2]
+    const m2 = r2Matches[pairIndex * 2 + 1]
+    const w1 = m1 ? (m1.winner_mint || predictions[m1.id] || '') : ''
+    const w2 = m2 ? (m2.winner_mint || predictions[m2.id] || '') : ''
+    return { coinA: w1, coinB: w2 }
+  }
+
+  const getFinalCoins = () => {
+    const m1 = sfMatches[0]
+    const m2 = sfMatches[1]
+    const w1 = m1 ? (m1.winner_mint || predictions[m1.id] || '') : ''
+    const w2 = m2 ? (m2.winner_mint || predictions[m2.id] || '') : ''
+    return { coinA: w1, coinB: w2 }
+  }
+
+  const isActive = arena.status === 'active'
+  const predictionOpen = new Date() < new Date(arena.prediction_closes_at)
+  const totalMatches = arena.matches?.length || 15
+  const totalPredicted = Object.keys(predictions).length
+
+  return (
+    <div>
+      {/* Arena header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <span className={'w-2 h-2 rounded-full ' + (isActive ? 'bg-[#00C41C] animate-pulse' : 'bg-yellow-500 animate-pulse')} />
+            <span className={'text-xs font-bold tracking-widest uppercase ' + (isActive ? 'text-[#00C41C]' : 'text-yellow-500')}>
+              {isActive ? (predictionOpen ? 'Prediction Window Open' : 'Arena Live — Predictions Closed') : 'Upcoming Arena — Prediction Window Open'}
+            </span>
+          </div>
+          <h2 className="text-4xl font-black tracking-tight">
+            {isActive ? 'LIVE ' : 'NEXT '}
+            <span className="text-[#00C41C]">ARENA</span>
+          </h2>
+          <div className="mt-2">
+            <Countdown
+              targetDate={predictionOpen ? arena.prediction_closes_at : arena.ends_at}
+              label={predictionOpen ? 'Predictions close in' : 'Arena ends in'}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Eligibility */}
+      {connected && !eligible && !submitted && (
+        <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-6 text-center">
+          <span className="text-red-400 font-black">
+            You need at least {minSol} SOL worth of $ARENA tokens to predict.{' '}
+            <a href={BUY_URL} target="_blank" rel="noopener noreferrer" className="underline ml-1">Buy $ARENA</a>
+          </span>
+        </div>
+      )}
+
+      {connected && eligible && !submitted && predictionOpen && (
+        <div className="bg-[#00C41C]/10 border border-[#00C41C]/30 rounded-xl p-3 mb-6 text-center">
+          <span className="text-[#00C41C] text-sm font-bold">✓ Eligible to predict</span>
+        </div>
+      )}
+
+      {submitted && (
+        <div className="bg-[#00C41C]/10 border border-[#00C41C]/40 rounded-xl p-4 mb-6 text-center">
+          <span className="text-[#00C41C] font-black">✓ Predictions submitted! Good luck!</span>
+        </div>
+      )}
+
+      {/* Progress bar */}
+      {!submitted && predictionOpen && connected && eligible && (
+        <div className="bg-[#0A0A0A] border border-[#00C41C]/20 rounded-xl p-4 mb-8 flex items-center justify-between">
+          <span className="text-gray-400 text-sm">Predictions: <span className="text-white font-black">{totalPredicted}/{totalMatches}</span></span>
+          <div className="flex-1 mx-6 bg-[#111] rounded-full h-2">
+            <div className="h-2 rounded-full bg-[#00C41C] transition-all" style={{ width: (totalMatches > 0 ? (totalPredicted / totalMatches) * 100 : 0) + '%' }} />
+          </div>
+          <span className="text-[#00C41C] font-black text-sm">{totalMatches > 0 ? Math.round((totalPredicted / totalMatches) * 100) : 0}%</span>
+        </div>
+      )}
+
+      {/* Round 1 */}
+      <h3 className="text-base font-black text-gray-400 tracking-widest uppercase mb-4">⚔️ {ROUND_LABELS[1]}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+        {r1Matches.map((match) => (
+          <MatchCard
+            key={match.id}
+            matchId={match.id}
+            coinAMint={match.coin_a_mint}
+            coinBMint={match.coin_b_mint}
+            round={1}
+            coins={coinMap}
+            predictions={predictions}
+            onPredict={onPredict}
+            connected={connected}
+            submitted={submitted}
+            eligible={eligible}
+            winnerMint={match.winner_mint}
+            scoreA={match.coin_a_score}
+            scoreB={match.coin_b_score}
+          />
+        ))}
+      </div>
+
+      {/* Round 2 */}
+      <h3 className="text-base font-black text-gray-400 tracking-widest uppercase mb-4">🏆 {ROUND_LABELS[2]}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+        {r2Matches.map((match, i) => {
+          const { coinA, coinB } = getR2Coins(i)
+          return (
+            <MatchCard
+              key={match.id}
+              matchId={match.id}
+              coinAMint={coinA}
+              coinBMint={coinB}
+              round={2}
+              coins={coinMap}
+              predictions={predictions}
+              onPredict={onPredict}
+              connected={connected}
+              submitted={submitted}
+              eligible={eligible}
+              isPlaceholder={!coinA || !coinB}
+              winnerMint={match.winner_mint}
+              scoreA={match.coin_a_score}
+              scoreB={match.coin_b_score}
+            />
+          )
+        })}
+      </div>
+
+      {/* Semi Finals */}
+      <h3 className="text-base font-black text-gray-400 tracking-widest uppercase mb-4">🔥 {ROUND_LABELS[3]}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+        {sfMatches.map((match, i) => {
+          const { coinA, coinB } = getSFCoins(i)
+          return (
+            <MatchCard
+              key={match.id}
+              matchId={match.id}
+              coinAMint={coinA}
+              coinBMint={coinB}
+              round={3}
+              coins={coinMap}
+              predictions={predictions}
+              onPredict={onPredict}
+              connected={connected}
+              submitted={submitted}
+              eligible={eligible}
+              isPlaceholder={!coinA || !coinB}
+              winnerMint={match.winner_mint}
+              scoreA={match.coin_a_score}
+              scoreB={match.coin_b_score}
+            />
+          )
+        })}
+      </div>
+
+      {/* Final */}
+      <h3 className="text-base font-black text-gray-400 tracking-widest uppercase mb-4">👑 {ROUND_LABELS[4]}</h3>
+      <div className="max-w-md mb-10">
+        {finalMatch && (() => {
+          const { coinA, coinB } = getFinalCoins()
+          return (
+            <MatchCard
+              matchId={finalMatch.id}
+              coinAMint={coinA}
+              coinBMint={coinB}
+              round={4}
+              coins={coinMap}
+              predictions={predictions}
+              onPredict={onPredict}
+              connected={connected}
+              submitted={submitted}
+              eligible={eligible}
+              isPlaceholder={!coinA || !coinB}
+              winnerMint={finalMatch.winner_mint}
+              scoreA={finalMatch.coin_a_score}
+              scoreB={finalMatch.coin_b_score}
+            />
+          )
+        })()}
+      </div>
+
+      {/* Submit button */}
+      {connected && predictionOpen && !submitted && eligible && (
+        <div className="text-center mt-6 mb-4">
+          <button
+            onClick={onSubmit}
+            disabled={totalPredicted < totalMatches || submitting}
+            className="bg-[#00C41C] text-black font-black px-16 py-5 rounded-xl text-xl hover:bg-[#00E620] transition-all hover:scale-105 hover:shadow-[0_0_40px_rgba(0,196,28,0.4)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+          >
+            {submitting ? 'SUBMITTING...' : 'SUBMIT PREDICTIONS'}
+          </button>
+          <p className="text-gray-600 text-sm mt-3">
+            {totalPredicted < totalMatches
+              ? 'Pick ' + (totalMatches - totalPredicted) + ' more to submit'
+              : 'All predictions ready — submit is final!'}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ArenaPage() {
   const { connected, publicKey } = useWallet()
   const [arena, setArena] = useState<Arena | null>(null)
+  const [upcomingArena, setUpcomingArena] = useState<Arena | null>(null)
   const [loading, setLoading] = useState(true)
-  const [predictions, setPredictions] = useState<{ [matchId: string]: string }>({})
-  const [submitted, setSubmitted] = useState(false)
+  const [activePredictions, setActivePredictions] = useState<{ [matchId: string]: string }>({})
+  const [upcomingPredictions, setUpcomingPredictions] = useState<{ [matchId: string]: string }>({})
+  const [activeSubmitted, setActiveSubmitted] = useState(false)
+  const [upcomingSubmitted, setUpcomingSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [upcomingSubmitting, setUpcomingSubmitting] = useState(false)
   const [eligible, setEligible] = useState<boolean>(true)
   const [eligibilityChecked, setEligibilityChecked] = useState<boolean>(false)
   const [minSol, setMinSol] = useState<number>(0.2)
+  const [activeTab, setActiveTab] = useState<'active' | 'upcoming'>('active')
 
   useEffect(() => {
-    fetchArena()
+    fetchArenas()
   }, [])
-
-  useEffect(() => {
-    if (connected && publicKey && arena) {
-      fetchExistingPredictions()
-    }
-  }, [connected, publicKey, arena])
 
   useEffect(() => {
     if (connected && publicKey) {
       checkEligibility()
     }
   }, [connected, publicKey])
+
+  useEffect(() => {
+    if (connected && publicKey && arena) {
+      fetchExistingPredictions(arena.id, setActivePredictions, setActiveSubmitted)
+    }
+  }, [connected, publicKey, arena])
+
+  useEffect(() => {
+    if (connected && publicKey && upcomingArena) {
+      fetchExistingPredictions(upcomingArena.id, setUpcomingPredictions, setUpcomingSubmitted)
+    }
+  }, [connected, publicKey, upcomingArena])
 
   async function checkEligibility() {
     if (!publicKey) return
@@ -226,38 +493,46 @@ export default function ArenaPage() {
     }
   }
 
-  async function fetchArena() {
+  async function fetchArenas() {
     try {
       const res = await fetch('/api/arena')
       const data = await res.json()
       setArena(data.arena)
+      setUpcomingArena(data.upcomingArena)
+      if (data.upcomingArena && !data.arena) {
+        setActiveTab('upcoming')
+      }
     } catch {
-      setError('Failed to load arena')
+      console.error('Failed to load arenas')
     } finally {
       setLoading(false)
     }
   }
 
-  async function fetchExistingPredictions() {
-    if (!publicKey || !arena) return
+  async function fetchExistingPredictions(
+    arenaId: string,
+    setPreds: (p: any) => void,
+    setSubmit: (s: boolean) => void
+  ) {
+    if (!publicKey) return
     try {
-      const res = await fetch('/api/predictions?wallet=' + publicKey.toString() + '&arena_id=' + arena.id)
+      const res = await fetch('/api/predictions?wallet=' + publicKey.toString() + '&arena_id=' + arenaId)
       const data = await res.json()
       if (data.predictions && data.predictions.length > 0) {
         const map: { [matchId: string]: string } = {}
         data.predictions.forEach((p: any) => {
           map[p.match_id] = p.predicted_winner_mint
         })
-        setPredictions(map)
-        setSubmitted(true)
+        setPreds(map)
+        setSubmit(true)
       }
     } catch {
       console.error('Failed to fetch predictions')
     }
   }
 
-  async function handleSubmit() {
-    if (!publicKey || !arena) return
+  async function handleSubmit(arenaId: string, predictions: { [k: string]: string }, setSubmitted: (s: boolean) => void, setSubmitting: (s: boolean) => void) {
+    if (!publicKey) return
     setSubmitting(true)
     try {
       const predictionsArray = Object.entries(predictions).map(([match_id, predicted_winner_mint]) => ({
@@ -270,7 +545,7 @@ export default function ArenaPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           wallet_address: publicKey.toString(),
-          arena_id: arena.id,
+          arena_id: arenaId,
           predictions: predictionsArray,
         }),
       })
@@ -278,19 +553,12 @@ export default function ArenaPage() {
       const data = await res.json()
       if (data.success) {
         setSubmitted(true)
-      } else {
-        setError('Failed to submit predictions')
       }
     } catch {
-      setError('Failed to submit predictions')
+      console.error('Failed to submit')
     } finally {
       setSubmitting(false)
     }
-  }
-
-  const handlePrediction = (matchId: string, mint: string) => {
-    if (submitted) return
-    setPredictions(prev => ({ ...prev, [matchId]: mint }))
   }
 
   if (loading) {
@@ -307,7 +575,7 @@ export default function ArenaPage() {
     )
   }
 
-  if (!arena) {
+  if (!arena && !upcomingArena) {
     return (
       <main className="min-h-screen bg-black text-white">
         <Navbar />
@@ -320,207 +588,66 @@ export default function ArenaPage() {
     )
   }
 
-  const coinMap: { [mint: string]: Coin } = {}
-  arena.arena_coins?.forEach((c) => { coinMap[c.token_mint] = c })
-
-  const r1Matches = arena.matches?.filter(m => m.round === 1) || []
-  const r2Matches = arena.matches?.filter(m => m.round === 2) || []
-  const sfMatches = arena.matches?.filter(m => m.round === 3) || []
-  const finalMatch = arena.matches?.find(m => m.round === 4)
-
-  const getR2Coins = (pairIndex: number) => {
-    const m1 = r1Matches[pairIndex * 2]
-    const m2 = r1Matches[pairIndex * 2 + 1]
-    const w1 = m1 ? predictions[m1.id] : null
-    const w2 = m2 ? predictions[m2.id] : null
-    return { coinA: w1 || '', coinB: w2 || '' }
-  }
-
-  const getSFCoins = (pairIndex: number) => {
-    const m1 = r2Matches[pairIndex * 2]
-    const m2 = r2Matches[pairIndex * 2 + 1]
-    const w1 = m1 ? predictions[m1.id] : null
-    const w2 = m2 ? predictions[m2.id] : null
-    return { coinA: w1 || '', coinB: w2 || '' }
-  }
-
-  const getFinalCoins = () => {
-    const m1 = sfMatches[0]
-    const m2 = sfMatches[1]
-    const w1 = m1 ? predictions[m1.id] : null
-    const w2 = m2 ? predictions[m2.id] : null
-    return { coinA: w1 || '', coinB: w2 || '' }
-  }
-
-  const totalMatches = arena.matches?.length || 15
-  const totalPredicted = Object.keys(predictions).length
-  const predictionOpen = new Date() < new Date(arena.prediction_closes_at)
-
   return (
     <main className="min-h-screen bg-black text-white">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-6 pt-24 pb-16">
 
-        <div className="flex items-center justify-between mb-10">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className={'w-2 h-2 rounded-full ' + (predictionOpen ? 'bg-[#00C41C] animate-pulse' : 'bg-yellow-500')} />
-              <span className={'text-xs font-bold tracking-widest uppercase ' + (predictionOpen ? 'text-[#00C41C]' : 'text-yellow-500')}>
-                {predictionOpen ? 'Prediction Window Open' : 'Arena Live — Predictions Closed'}
-              </span>
-            </div>
-            <h1 className="text-5xl font-black tracking-tight">BATTLE <span className="text-[#00C41C]">ARENA</span></h1>
-            <div className="mt-2">
-              <Countdown
-                targetDate={predictionOpen ? arena.prediction_closes_at : arena.ends_at}
-                label={predictionOpen ? 'Predictions close in' : 'Arena ends in'}
-              />
-            </div>
-          </div>
-        </div>
+        <h1 className="text-5xl font-black tracking-tight mb-8">BATTLE <span className="text-[#00C41C]">ARENA</span></h1>
 
-        {submitted && (
-          <div className="bg-[#00C41C]/10 border border-[#00C41C]/40 rounded-xl p-4 mb-8 text-center">
-            <span className="text-[#00C41C] font-black">Predictions submitted! Good luck!</span>
-          </div>
-        )}
-
-        {connected && eligibilityChecked && !eligible && (
-          <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-8 text-center">
-            <span className="text-red-400 font-black">
-              You need at least {minSol} SOL worth of $ARENA tokens to predict.{' '}
-              <a href={BUY_URL} target="_blank" rel="noopener noreferrer" className="underline ml-1">Buy $ARENA</a>
-            </span>
-          </div>
-        )}
-
-        {connected && eligibilityChecked && eligible && !submitted && (
-          <div className="bg-[#00C41C]/10 border border-[#00C41C]/30 rounded-xl p-3 mb-8 text-center">
-            <span className="text-[#00C41C] text-sm font-bold">Eligible to predict</span>
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-8 text-center">
-            <span className="text-red-400 font-bold">{error}</span>
-          </div>
-        )}
-
-        {!submitted && predictionOpen && (
-          <div className="bg-[#0A0A0A] border border-[#00C41C]/20 rounded-xl p-4 mb-10 flex items-center justify-between">
-            <span className="text-gray-400 text-sm">Your predictions: <span className="text-white font-black">{totalPredicted}/{totalMatches}</span></span>
-            <div className="flex-1 mx-6 bg-[#111] rounded-full h-2">
-              <div className="h-2 rounded-full bg-[#00C41C] transition-all" style={{ width: (totalMatches > 0 ? (totalPredicted / totalMatches) * 100 : 0) + '%' }} />
-            </div>
-            <span className="text-[#00C41C] font-black text-sm">{totalMatches > 0 ? Math.round((totalPredicted / totalMatches) * 100) : 0}%</span>
-          </div>
-        )}
-
-        <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">⚔️ {ROUND_LABELS[1]}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
-          {r1Matches.map((match) => (
-            <MatchCard
-              key={match.id}
-              matchId={match.id}
-              coinAMint={match.coin_a_mint}
-              coinBMint={match.coin_b_mint}
-              round={1}
-              coins={coinMap}
-              predictions={predictions}
-              onPredict={handlePrediction}
-              connected={connected}
-              submitted={submitted}
-              eligible={eligible}
-            />
-          ))}
-        </div>
-
-        <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">🏆 {ROUND_LABELS[2]}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
-          {r2Matches.map((match, i) => {
-            const { coinA, coinB } = getR2Coins(i)
-            return (
-              <MatchCard
-                key={match.id}
-                matchId={match.id}
-                coinAMint={coinA}
-                coinBMint={coinB}
-                round={2}
-                coins={coinMap}
-                predictions={predictions}
-                onPredict={handlePrediction}
-                connected={connected}
-                submitted={submitted}
-                eligible={eligible}
-                isPlaceholder={!coinA || !coinB}
-              />
-            )
-          })}
-        </div>
-
-        <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">🔥 {ROUND_LABELS[3]}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
-          {sfMatches.map((match, i) => {
-            const { coinA, coinB } = getSFCoins(i)
-            return (
-              <MatchCard
-                key={match.id}
-                matchId={match.id}
-                coinAMint={coinA}
-                coinBMint={coinB}
-                round={3}
-                coins={coinMap}
-                predictions={predictions}
-                onPredict={handlePrediction}
-                connected={connected}
-                submitted={submitted}
-                eligible={eligible}
-                isPlaceholder={!coinA || !coinB}
-              />
-            )
-          })}
-        </div>
-
-        <h2 className="text-lg font-black text-gray-400 tracking-widest uppercase mb-6">👑 {ROUND_LABELS[4]}</h2>
-        <div className="max-w-md mb-12">
-          {finalMatch && (() => {
-            const { coinA, coinB } = getFinalCoins()
-            return (
-              <MatchCard
-                matchId={finalMatch.id}
-                coinAMint={coinA}
-                coinBMint={coinB}
-                round={4}
-                coins={coinMap}
-                predictions={predictions}
-                onPredict={handlePrediction}
-                connected={connected}
-                submitted={submitted}
-                eligible={eligible}
-                isPlaceholder={!coinA || !coinB}
-              />
-            )
-          })()}
-        </div>
-
-        {connected && predictionOpen && !submitted && (
-          <div className="text-center mt-10">
+        {/* Tabs */}
+        {arena && upcomingArena && (
+          <div className="flex gap-3 mb-10">
             <button
-              onClick={handleSubmit}
-              disabled={totalPredicted < totalMatches || submitting || !eligible}
-              className="bg-[#00C41C] text-black font-black px-16 py-5 rounded-xl text-xl hover:bg-[#00E620] transition-all hover:scale-105 hover:shadow-[0_0_40px_rgba(0,196,28,0.4)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+              onClick={() => setActiveTab('active')}
+              className={'px-6 py-3 rounded-xl font-black text-sm transition-all ' + (activeTab === 'active' ? 'bg-[#00C41C] text-black' : 'bg-[#0A0A0A] text-gray-400 border border-[#00C41C]/20 hover:border-[#00C41C]/40')}
             >
-              {submitting ? 'SUBMITTING...' : 'SUBMIT PREDICTIONS'}
+              LIVE ARENA
             </button>
-            <p className="text-gray-600 text-sm mt-3">
-              {!eligible
-                ? 'You need ' + minSol + ' SOL worth of $ARENA tokens to submit'
-                : totalPredicted < totalMatches
-                ? 'Pick ' + (totalMatches - totalPredicted) + ' more to submit'
-                : 'All predictions ready — submit is final!'}
-            </p>
+            <button
+              onClick={() => setActiveTab('upcoming')}
+              className={'px-6 py-3 rounded-xl font-black text-sm transition-all ' + (activeTab === 'upcoming' ? 'bg-yellow-500 text-black' : 'bg-[#0A0A0A] text-gray-400 border border-yellow-500/20 hover:border-yellow-500/40')}
+            >
+              NEXT ARENA
+            </button>
           </div>
+        )}
+
+        {/* Active arena */}
+        {activeTab === 'active' && arena && (
+          <ArenaSection
+            arena={arena}
+            predictions={activePredictions}
+            onPredict={(matchId, mint) => {
+              if (activeSubmitted) return
+              setActivePredictions(prev => ({ ...prev, [matchId]: mint }))
+            }}
+            connected={connected}
+            submitted={activeSubmitted}
+            eligible={eligible}
+            minSol={minSol}
+            onSubmit={() => handleSubmit(arena.id, activePredictions, setActiveSubmitted, setSubmitting)}
+            submitting={submitting}
+          />
+        )}
+
+        {/* Upcoming arena */}
+        {activeTab === 'upcoming' && upcomingArena && (
+          <ArenaSection
+            arena={upcomingArena}
+            predictions={upcomingPredictions}
+            onPredict={(matchId, mint) => {
+              if (upcomingSubmitted) return
+              setUpcomingPredictions(prev => ({ ...prev, [matchId]: mint }))
+            }}
+            connected={connected}
+            submitted={upcomingSubmitted}
+            eligible={eligible}
+            minSol={minSol}
+            onSubmit={() => handleSubmit(upcomingArena.id, upcomingPredictions, setUpcomingSubmitted, setUpcomingSubmitting)}
+            submitting={upcomingSubmitting}
+          />
         )}
 
       </div>
