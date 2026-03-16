@@ -3,23 +3,28 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET() {
   try {
-    const { data: arena, error } = await supabaseAdmin
+    // Dohvati aktivnu arenu
+    const { data: activeArena } = await supabaseAdmin
       .from('arenas')
-      .select(`
-        *,
-        arena_coins(*),
-        matches(*)
-      `)
+      .select('*, arena_coins(*), matches(*)')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
 
-    if (error || !arena) {
-      return NextResponse.json({ arena: null })
-    }
+    // Dohvati upcoming arenu
+    const { data: upcomingArena } = await supabaseAdmin
+      .from('arenas')
+      .select('*, arena_coins(*), matches(*)')
+      .eq('status', 'upcoming')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
 
-    return NextResponse.json({ arena })
+    return NextResponse.json({ 
+      arena: activeArena || null,
+      upcomingArena: upcomingArena || null
+    })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch arena' }, { status: 500 })
   }
