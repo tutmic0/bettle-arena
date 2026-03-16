@@ -48,6 +48,7 @@ export default function ProfilePage() {
   const [balance, setBalance] = useState<number>(0)
   const [eligible, setEligible] = useState<boolean>(true)
   const [loading, setLoading] = useState(true)
+  const [claiming, setClaiming] = useState<string | null>(null)
 
   useEffect(() => {
     if (connected && publicKey) {
@@ -86,6 +87,32 @@ export default function ProfilePage() {
       console.error('Failed to fetch profile data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleClaim(arena_id: string) {
+    if (!publicKey) return
+    setClaiming(arena_id)
+    try {
+      const res = await fetch('/api/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wallet_address: publicKey.toString(),
+          arena_id,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert('Reward claimed successfully!')
+        fetchProfileData()
+      } else {
+        alert('Claim failed: ' + data.error)
+      }
+    } catch {
+      alert('Claim failed')
+    } finally {
+      setClaiming(null)
     }
   }
 
@@ -254,8 +281,12 @@ export default function ProfilePage() {
                     {entry.reward_claimed ? (
                       <span className="text-gray-600 text-xs font-bold">CLAIMED</span>
                     ) : entry.reward_amount > 0 ? (
-                      <button className="bg-[#00C41C] text-black font-black text-xs px-4 py-2 rounded-lg hover:bg-[#00E620] transition-all">
-                        CLAIM
+                      <button
+                        onClick={() => handleClaim(entry.arena_id)}
+                        disabled={claiming === entry.arena_id}
+                        className="bg-[#00C41C] text-black font-black text-xs px-4 py-2 rounded-lg hover:bg-[#00E620] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {claiming === entry.arena_id ? 'CLAIMING...' : 'CLAIM'}
                       </button>
                     ) : (
                       <span className="text-gray-600 text-xs">—</span>
