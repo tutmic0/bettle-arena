@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/finalize-round",
       "schedule": "0 3-23/4 * * *"
+    },
+    {
+      "path": "/api/cron/claim-vault",
+      "schedule": "0 0 * * *"
     }
   ]
 }
