@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/claim-vault",
       "schedule": "0 0 * * *"
-    }
+    },
+    {
+  "path": "/api/cron/activate-round",
+  "schedule": "30 */1 * * *"
+}
   ]
 }
