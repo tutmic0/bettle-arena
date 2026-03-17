@@ -55,21 +55,18 @@ export async function GET(req: NextRequest) {
           continue
         }
 
-        for (const transaction of claimTransactions) {
+       for (const transaction of claimTransactions) {
   try {
-    const connection2 = sdk.state.getConnection()
-    const { blockhash } = await connection2.getLatestBlockhash()
-    transaction.recentBlockhash = blockhash
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash
     transaction.feePayer = keypair.publicKey
-    transaction.sign(keypair)
+    transaction.partialSign(keypair)
     
-    const sig = await connection2.sendRawTransaction(transaction.serialize(), {
-      skipPreflight: false,
-      maxRetries: 3,
-    })
-    await connection2.confirmTransaction(sig, 'confirmed')
+    const sig = await connection.sendRawTransaction(transaction.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    }))
+    await connection.confirmTransaction(sig, 'confirmed')
     signatures.push(sig)
-    console.log('Claimed! Sig:', sig)
   } catch (txErr: any) {
     console.error('Tx failed:', txErr?.message)
   }
