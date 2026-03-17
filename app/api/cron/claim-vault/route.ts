@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Connection, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { Connection, Keypair } from '@solana/web3.js'
 import bs58 from 'bs58'
+import { BagsSDK, signAndSendTransaction } from '@bagsfm/bags-sdk'
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,45 +21,50 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Missing env variables' }, { status: 400 })
     }
 
-    const { BagsSDK, signAndSendTransaction } = await import('@bagsfm/bags-sdk')
-
-    const keypair = Keypair.fromSecretKey(bs58.decode(PRIVATE_KEY))
     const connection = new Connection(RPC_URL, 'processed')
     const sdk = new BagsSDK(BAGS_API_KEY, connection, 'processed')
+    const keypair = Keypair.fromSecretKey(bs58.decode(PRIVATE_KEY))
 
-    // Dohvati sve claimable pozicije
+    // Dohvati sve claimable pozicije za treasury wallet
     const allPositions = await sdk.fee.getAllClaimablePositions(keypair.publicKey)
 
     if (!allPositions || allPositions.length === 0) {
-      return NextResponse.json({ message: 'No claimable positions' })
+      return NextResponse.json({ message: 'No claimable positions found' })
     }
 
-    // Filtriraj za $ARENA token sa nečim za claimati
+    // Filtriraj za $ARENA token
     const targetPositions = allPositions.filter(
-      (p: any) => p.baseMint === ARENA_TOKEN_MINT && 
-      (p.totalClaimableLamportsUserShare > 0 || p.virtualPoolClaimableLamportsUserShare > 0)
+      (p: any) => p.baseMint === ARENA_TOKEN_MINT
     )
 
     if (targetPositions.length === 0) {
-      return NextResponse.json({ 
-        message: 'Nothing to claim',
-        total_positions: allPositions.length 
-      })
+      return NextResponse.json({ message: 'No claimable positions for ARENA token' })
     }
 
     const signatures: string[] = []
 
     for (const position of targetPositions) {
       try {
-        const claimTxs = await sdk.fee.getClaimTransaction(keypair.publicKey, position)
+        const claimTransactions = await sdk.fee.getClaimTransaction(
+          keypair.publicKey,
+          position
+        )
 
-        if (!claimTxs || claimTxs.length === 0) continue
+        if (!claimTransactions || claimTransactions.length === 0) {
+          console.log('No transactions generated for position')
+          continue
+        }
 
-        for (const tx of claimTxs) {
+        for (const transaction of claimTransactions) {
           try {
-            const sig = await signAndSendTransaction(connection, 'processed', tx, keypair)
+            const sig = await signAndSendTransaction(
+              connection,
+              'processed',
+              transaction,
+              keypair
+            )
             signatures.push(sig)
-            console.log('Claimed! Signature:', sig)
+            console.log('Claimed! Sig:', sig)
           } catch (txErr: any) {
             console.error('Tx failed:', txErr?.message)
           }
@@ -75,6 +81,6 @@ export async function GET(req: NextRequest) {
       signatures,
     })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed' }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'Claim vault failed' }, { status: 500 })
   }
 }
