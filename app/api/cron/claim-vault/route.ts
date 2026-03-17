@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Connection, Keypair, VersionedTransaction, Transaction } from '@solana/web3.js'
+import { Connection, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js'
 import bs58 from 'bs58'
-
-const BAGS_API_URL = 'https://public-api-v2.bags.fm/api/v1'
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,71 +20,45 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Missing env variables' }, { status: 400 })
     }
 
+    const { BagsSDK, signAndSendTransaction } = await import('@bagsfm/bags-sdk')
+
     const keypair = Keypair.fromSecretKey(bs58.decode(PRIVATE_KEY))
-    const walletAddress = keypair.publicKey.toBase58()
-    const connection = new Connection(RPC_URL, 'confirmed')
+    const connection = new Connection(RPC_URL, 'processed')
+    const sdk = new BagsSDK(BAGS_API_KEY, connection, 'processed')
 
-    // Korak 1 — Dohvati claimable pozicije
-    const positionsRes = await fetch(
-      `${BAGS_API_URL}/token-launch/claimable-positions?wallet=${walletAddress}`,
-      { headers: { 'x-api-key': BAGS_API_KEY } }
-    )
-    const positionsData = await positionsRes.json()
+    // Dohvati sve claimable pozicije
+    const allPositions = await sdk.fee.getAllClaimablePositions(keypair.publicKey)
 
-    if (!positionsData.success || !positionsData.response?.length) {
+    if (!allPositions || allPositions.length === 0) {
       return NextResponse.json({ message: 'No claimable positions' })
     }
 
-    const targetPositions = positionsData.response.filter(
-      (p: any) => p.baseMint === ARENA_TOKEN_MINT && p.totalClaimableLamportsUserShare > 0
+    // Filtriraj za $ARENA token sa nečim za claimati
+    const targetPositions = allPositions.filter(
+      (p: any) => p.baseMint === ARENA_TOKEN_MINT && 
+      (p.totalClaimableLamportsUserShare > 0 || p.virtualPoolClaimableLamportsUserShare > 0)
     )
 
     if (targetPositions.length === 0) {
-      return NextResponse.json({ message: 'Nothing to claim for ARENA token' })
+      return NextResponse.json({ 
+        message: 'Nothing to claim',
+        total_positions: allPositions.length 
+      })
     }
 
     const signatures: string[] = []
 
     for (const position of targetPositions) {
       try {
-        // Korak 2 — Dohvati claim transakcije sa position objektom
-        const claimRes = await fetch(`${BAGS_API_URL}/token-launch/claim-transactions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': BAGS_API_KEY,
-          },
-          body: JSON.stringify({
-            wallet: walletAddress,
-            position,
-          }),
-        })
+        const claimTxs = await sdk.fee.getClaimTransaction(keypair.publicKey, position)
 
-        const claimData = await claimRes.json()
-        console.log('Claim response:', JSON.stringify(claimData))
+        if (!claimTxs || claimTxs.length === 0) continue
 
-        if (!claimData.success || !claimData.response?.length) continue
-
-        for (const item of claimData.response) {
+        for (const tx of claimTxs) {
           try {
-            const txBase64 = typeof item === 'string' ? item : item.tx
-            const txBuffer = Buffer.from(txBase64, 'base64')
-
-            let signature: string
-
-            try {
-              const tx = VersionedTransaction.deserialize(txBuffer)
-              tx.sign([keypair])
-              signature = await connection.sendTransaction(tx, { maxRetries: 3 })
-            } catch {
-              const tx = Transaction.from(txBuffer)
-              tx.partialSign(keypair)
-              signature = await connection.sendRawTransaction(tx.serialize(), { maxRetries: 3 })
-            }
-
-            await connection.confirmTransaction(signature, 'confirmed')
-            signatures.push(signature)
-
+            const sig = await signAndSendTransaction(connection, 'processed', tx, keypair)
+            signatures.push(sig)
+            console.log('Claimed! Signature:', sig)
           } catch (txErr: any) {
             console.error('Tx failed:', txErr?.message)
           }
