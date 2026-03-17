@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     const { data: round } = await supabaseAdmin
       .from('rounds')
       .select('*, round_matches(*)')
-      .eq('status', 'active')
+      .in('status', ['active', 'predicting'])
       .single()
 
     if (!round) {
