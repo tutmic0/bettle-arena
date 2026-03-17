@@ -57,12 +57,17 @@ export async function GET(req: NextRequest) {
 
         for (const transaction of claimTransactions) {
   try {
-    const sig = await signAndSendTransaction(
-      connection,
-      'processed',
-      transaction as any,
-      keypair
-    )
+    const connection2 = sdk.state.getConnection()
+    const { blockhash } = await connection2.getLatestBlockhash()
+    transaction.recentBlockhash = blockhash
+    transaction.feePayer = keypair.publicKey
+    transaction.sign(keypair)
+    
+    const sig = await connection2.sendRawTransaction(transaction.serialize(), {
+      skipPreflight: false,
+      maxRetries: 3,
+    })
+    await connection2.confirmTransaction(sig, 'confirmed')
     signatures.push(sig)
     console.log('Claimed! Sig:', sig)
   } catch (txErr: any) {
