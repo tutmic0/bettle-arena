@@ -26,70 +26,83 @@ export async function GET(req: NextRequest) {
     const walletAddress = keypair.publicKey.toBase58()
     const connection = new Connection(RPC_URL, 'confirmed')
 
-    // Dohvati claim transakcije v3 — samo feeClaimer i tokenMint
-    const claimRes = await fetch(`${BAGS_API_URL}/token-launch/claim-txs/v3`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': BAGS_API_KEY,
-      },
-      body: JSON.stringify({
-        feeClaimer: walletAddress,
-        tokenMint: ARENA_TOKEN_MINT,
-      }),
-    })
+    // Korak 1 — Dohvati claimable pozicije
+    const positionsRes = await fetch(
+      `${BAGS_API_URL}/token-launch/claimable-positions?wallet=${walletAddress}`,
+      { headers: { 'x-api-key': BAGS_API_KEY } }
+    )
+    const positionsData = await positionsRes.json()
 
-    const claimData = await claimRes.json()
+    if (!positionsData.success || !positionsData.response?.length) {
+      return NextResponse.json({ message: 'No claimable positions' })
+    }
 
-    if (!claimData.success || !claimData.response?.length) {
-      return NextResponse.json({ message: 'Nothing to claim', data: claimData })
+    const targetPositions = positionsData.response.filter(
+      (p: any) => p.baseMint === ARENA_TOKEN_MINT && p.totalClaimableLamportsUserShare > 0
+    )
+
+    if (targetPositions.length === 0) {
+      return NextResponse.json({ message: 'Nothing to claim for ARENA token' })
     }
 
     const signatures: string[] = []
 
-    // Potpiši i pošalji svaku transakciju
-    for (const item of claimData.response) {
+    for (const position of targetPositions) {
       try {
-        const txBuffer = Buffer.from(item.tx, 'base64')
+        // Korak 2 — Dohvati claim transakcije sa position objektom
+        const claimRes = await fetch(`${BAGS_API_URL}/token-launch/claim-transactions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': BAGS_API_KEY,
+          },
+          body: JSON.stringify({
+            wallet: walletAddress,
+            position,
+          }),
+        })
 
-        let signature: string
+        const claimData = await claimRes.json()
+        console.log('Claim response:', JSON.stringify(claimData))
 
-        try {
-          const tx = VersionedTransaction.deserialize(txBuffer)
-          tx.sign([keypair])
-          signature = await connection.sendTransaction(tx, {
-            skipPreflight: false,
-            maxRetries: 3,
-          })
-        } catch {
-          const tx = Transaction.from(txBuffer)
-          tx.partialSign(keypair)
-          signature = await connection.sendRawTransaction(tx.serialize(), {
-            skipPreflight: false,
-            maxRetries: 3,
-          })
+        if (!claimData.success || !claimData.response?.length) continue
+
+        for (const item of claimData.response) {
+          try {
+            const txBase64 = typeof item === 'string' ? item : item.tx
+            const txBuffer = Buffer.from(txBase64, 'base64')
+
+            let signature: string
+
+            try {
+              const tx = VersionedTransaction.deserialize(txBuffer)
+              tx.sign([keypair])
+              signature = await connection.sendTransaction(tx, { maxRetries: 3 })
+            } catch {
+              const tx = Transaction.from(txBuffer)
+              tx.partialSign(keypair)
+              signature = await connection.sendRawTransaction(tx.serialize(), { maxRetries: 3 })
+            }
+
+            await connection.confirmTransaction(signature, 'confirmed')
+            signatures.push(signature)
+
+          } catch (txErr: any) {
+            console.error('Tx failed:', txErr?.message)
+          }
         }
-
-        await connection.confirmTransaction({
-          signature,
-          blockhash: item.blockhash.blockhash,
-          lastValidBlockHeight: item.blockhash.lastValidBlockHeight,
-        }, 'confirmed')
-
-        signatures.push(signature)
-        console.log('Claimed! Tx:', signature)
-
-      } catch (txErr: any) {
-        console.error('Transaction failed:', txErr?.message)
+      } catch (posErr: any) {
+        console.error('Position failed:', posErr?.message)
       }
     }
 
     return NextResponse.json({
       success: true,
+      positions_found: targetPositions.length,
       transactions_sent: signatures.length,
       signatures,
     })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Claim vault failed' }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'Failed' }, { status: 500 })
   }
 }
