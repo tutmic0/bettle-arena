@@ -56,19 +56,19 @@ export async function GET(req: NextRequest) {
         }
 
         for (const transaction of claimTransactions) {
-          try {
-            const sig = await signAndSendTransaction(
-              connection,
-              'processed',
-              transaction,
-              keypair
-            )
-            signatures.push(sig)
-            console.log('Claimed! Sig:', sig)
-          } catch (txErr: any) {
-            console.error('Tx failed:', txErr?.message)
-          }
-        }
+  try {
+    const sig = await signAndSendTransaction(
+      connection,
+      'processed',
+      transaction as any,
+      keypair
+    )
+    signatures.push(sig)
+    console.log('Claimed! Sig:', sig)
+  } catch (txErr: any) {
+    console.error('Tx failed:', txErr?.message)
+  }
+}
       } catch (posErr: any) {
         console.error('Position failed:', posErr?.message)
       }
