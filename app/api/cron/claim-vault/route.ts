@@ -57,15 +57,12 @@ export async function GET(req: NextRequest) {
 
        for (const transaction of claimTransactions) {
   try {
-    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash
-    transaction.feePayer = keypair.publicKey
-    transaction.partialSign(keypair)
-    
-    const sig = await connection.sendRawTransaction(transaction.serialize({
-      requireAllSignatures: false,
-      verifySignatures: false,
-    }))
-    await connection.confirmTransaction(sig, 'confirmed')
+    const sig = await signAndSendTransaction(
+      connection,
+      'confirmed',
+      transaction as any,
+      keypair
+    )
     signatures.push(sig)
   } catch (txErr: any) {
     console.error('Tx failed:', txErr?.message)
