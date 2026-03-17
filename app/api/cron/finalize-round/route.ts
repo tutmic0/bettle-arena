@@ -12,10 +12,13 @@ export async function GET(req: NextRequest) {
 
     // Dohvati active round
     const { data: round } = await supabaseAdmin
-      .from('rounds')
-      .select('*, round_matches(*)')
-      .in('status', ['active', 'predicting'])
-      .single()
+  .from('rounds')
+  .select('*, round_matches(*)')
+  .in('status', ['active', 'predicting'])
+  .lte('ends_at', new Date().toISOString())
+  .order('ends_at', { ascending: true })
+  .limit(1)
+  .single()
 
     if (!round) {
       return NextResponse.json({ message: 'No active round' })
